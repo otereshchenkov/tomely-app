@@ -1,0 +1,28 @@
+{
+  "name": "tomely-app",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w app",
+    "build": "npm run build -w app",
+    "start": "npm run start -w app",
+    "test": "npm run test -w app",
+    "lint": "eslint",
+    "check": "prettier --check .",
+    "format": "prettier --write . && eslint --fix"
+  },
+  "devDependencies": {
+    "@tanstack/eslint-config": "latest",
+    "@types/node": "^26.1.0",
+    "eslint": "^10.4.1",
+    "prettier": "^3.8.4",
+    "typescript": "~7.0.2"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true,
+    "unrs-resolver@1.12.2": true
+  }
+}

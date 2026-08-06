@@ -1,0 +1,22 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+__unconfig*
+todos.json
+
+# Vite / Nitro / TanStack Start build output
+.nitro
+.tanstack
+.output
+app/.output/
+app/.tanstack/
+app/.nitro/
+
+# Rust
+target
+
+# IntelliJ
+.idea

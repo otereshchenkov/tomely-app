@@ -1,0 +1,37 @@
+# Local development dependencies.
+#
+# For now this is Postgres only - the API (`cargo run`) and the web app
+# (`npm run dev`) run natively against it. When both are containerised they join
+# here as:
+#
+#   api:  built from the repository root (Cargo.toml lives there), depends_on
+#         postgres, DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tomely
+#   web:  built from ./app, runs `node .output/server/index.mjs`, with
+#         API_INTERNAL_URL=http://api:8080 for server-side rendering and
+#         VITE_API_URL baked in at build time for the browser.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: tomely-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tomely}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - tomely_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tomely}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  tomely_postgres_data:

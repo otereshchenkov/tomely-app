@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit,Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [[ \"{{file}}\" == *\".env\"* ]]; then echo \"❌ Blocked: .env files should not be edited. Use .env.example instead.\"; exit 1; fi'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit,Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath // empty' | { read -r f; [ -n \"$f\" ] || exit 0; root=\"$(cd \"${CLAUDE_PROJECT_DIR:-.}\" && pwd)\"; case \"$f\" in \"$root\"/*) ;; *) exit 0;; esac; [ -d \"$root/node_modules\" ] || exit 0; cd \"$root\" && npx prettier --write --ignore-unknown \"$f\"; }",
+            "timeout": 60,
+            "statusMessage": "Formatting with Prettier"
+          },
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath // empty' | { read -r f; case \"$f\" in */app/*.ts|*/app/*.tsx) root=\"${CLAUDE_PROJECT_DIR:-.}\"; [ -d \"$root/node_modules\" ] || exit 0; cd \"$root\" && npx tsc --noEmit --pretty -p app/tsconfig.json;; esac; }",
+            "timeout": 120,
+            "statusMessage": "Type-checking app/"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Read",
+      "Bash(npm run *)",
+      "Bash(cargo *)",
+      "Bash(git *)",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Skill(deep-research)",
+      "WebSearch",
+      "Bash(npm view *)",
+      "Bash(gh repo *)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(xargs cat)",
+      "mcp__plugin_context7_context7__query-docs",
+      "mcp__aws-mcp__aws___read_documentation",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__aws-mcp__aws___search_documentation",
+      "mcp__aws-mcp__aws___retrieve_skill"
+    ]
+  }
+}
