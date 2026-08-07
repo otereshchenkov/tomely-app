@@ -8,6 +8,16 @@
 //! Apply with `cargo run --bin migrate -- up`, then regenerate the entities in
 //! `src/entities/` - never edit those by hand.
 
+// `rust_2018_idioms` wants `&SchemaManager<'_>`, but these signatures belong to
+// `MigrationTrait` and go through `#[async_trait]`, which makes that lifetime
+// early-bound and stops the impl matching the trait (E0195). The elided form is
+// the only one that compiles, so the lint is off for every migration in here
+// rather than being worked around in each one.
+#![allow(
+    elided_lifetimes_in_paths,
+    reason = "async_trait requires the elided form in MigrationTrait impls"
+)]
+
 pub use sea_orm_migration::prelude::*;
 
 mod m0001_create_users;

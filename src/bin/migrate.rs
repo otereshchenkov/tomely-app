@@ -1,6 +1,6 @@
 //! Migration CLI: `cargo run --bin migrate -- up | down | status | fresh`.
 //!
-//! Reads DATABASE_URL from the environment (or a local .env).
+//! Reads `DATABASE_URL` from the environment (or a local .env).
 
 use sea_orm_migration::cli;
 

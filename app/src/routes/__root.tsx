@@ -2,10 +2,13 @@ import {
   HeadContent,
   Scripts,
   createRootRouteWithContext,
+  redirect,
 } from '@tanstack/react-router'
 import { ColorSchemeScript, mantineHtmlProps } from '@mantine/core'
 
 import { App } from '../App'
+import { ApiUnreachable } from '../components/ApiUnreachable'
+import { setupStatusQuery } from '../lib/setup'
 
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -17,6 +20,27 @@ const SITE_NAME = 'Tomely'
 const SITE_DESCRIPTION = 'A home library, catalogued.'
 
 export const Route = createRootRouteWithContext<RouterContext>()({
+  /**
+   * An instance with no users has not been claimed yet, and nothing else about
+   * it is worth showing until it has been.
+   *
+   * Whether setup is done is public information - it is what the sign-in page
+   * implies anyway - so this runs happily on the server for the first request
+   * and produces a real redirect rather than a flash of the wrong page. Auth
+   * stays out of it: once the instance is set up, /dashboard decides for itself
+   * whether the visitor is signed in, which is what makes a manual visit to
+   * /setup land on the dashboard or the login page as appropriate.
+   */
+  beforeLoad: async ({ context, location }) => {
+    const { initialized } =
+      await context.queryClient.ensureQueryData(setupStatusQuery)
+    // Tolerate a trailing slash: `/setup/` reaching here as "not the setup
+    // page" would leave the wizard reachable on a configured instance.
+    const onSetup = location.pathname.replace(/\/+$/, '') === '/setup'
+
+    if (!initialized && !onSetup) throw redirect({ to: '/setup' })
+    if (initialized && onSetup) throw redirect({ to: '/dashboard' })
+  },
   // Site-wide defaults. Routes that are shared as links - a book, a shelf, an
   // author - override title/og:* in their own head() so the preview a friend
   // sees in a chat app is about that page, not about the site.
@@ -73,6 +97,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   }),
   shellComponent: RootDocument,
   notFoundComponent: NotFound,
+  // beforeLoad above talks to the API, so an API that is down must not leave
+  // every page blank.
+  errorComponent: ApiUnreachable,
 })
 
 function RootDocument({ children }: Readonly<{ children: React.ReactNode }>) {

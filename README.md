@@ -27,6 +27,8 @@ Three terminals, from the repository root:
 
 ```bash
 cp .env.example .env
+# The API signs its tokens with this and refuses to start without it.
+echo "JWT_SECRET=$(openssl rand -base64 48)" >> .env
 docker compose up -d           # Postgres on :5432
 
 cargo run --bin migrate -- up  # apply migrations
@@ -36,9 +38,12 @@ npm install
 npm run dev                    # web app on :3000
 ```
 
-`http://localhost:3000` should render the API's health payload. The dev server
-proxies `/api` to the API, so the browser stays on one origin and CORS never
-comes up.
+The dev server proxies `/api` to the API, so the browser stays on one origin and
+CORS never comes up.
+
+`http://localhost:3000` on a fresh database redirects to `/setup`, which is where
+you create the instance owner: an instance with no users has not been claimed yet.
+Once it has, `/setup` is gone and `/login` takes over.
 
 ## Why the Web App Renders on the Server
 

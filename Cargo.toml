@@ -19,18 +19,74 @@ name = "migrate"
 path = "src/bin/migrate.rs"
 
 [dependencies]
-async-trait = "0.1.91"
-axum = "0.8.9"
-chrono = { version = "0.4.45", features = ["serde"] }
-dotenvy = "0.15.7"
-sea-orm = { version = "2.0.1", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-uuid", "with-chrono", "with-json"] }
-sea-orm-migration = { version = "2.0.1", default-features = false, features = ["cli", "sqlx-postgres", "runtime-tokio-rustls"] }
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
-thiserror = "2.0.19"
-tokio = { version = "1.53.1", features = ["full"] }
-tower = "0.5.3"
-tower-http = { version = "0.7.0", features = ["cors", "trace"] }
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-uuid = { version = "1.24.0", features = ["v7", "serde"] }
+argon2 = "=0.5.3"
+async-trait = "=0.1.91"
+axum = "=0.8.9"
+axum-extra = { version = "=0.12.6", features = ["typed-header"] }
+chrono = { version = "=0.4.45", features = ["serde"] }
+dotenvy = "=0.15.7"
+# No default features: `use_pem` is for asymmetric keys we do not have, and one of
+# `rust_crypto`/`aws_lc_rs` has to be picked explicitly or every sign/verify panics
+# for want of a provider. `rust_crypto` keeps the build free of a C toolchain, in
+# keeping with the rustls backend the rest of the stack already uses.
+jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["rust_crypto"] }
+sea-orm = { version = "=2.0.1", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-uuid", "with-chrono", "with-json"] }
+sea-orm-migration = { version = "=2.0.1", default-features = false, features = ["cli", "sqlx-postgres", "runtime-tokio-rustls"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+thiserror = "=2.0.19"
+tokio = { version = "=1.53.1", features = ["full"] }
+tower = "=0.5.3"
+tower-http = { version = "=0.7.0", features = ["cors", "trace"] }
+tracing = "=0.1.44"
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter"] }
+uuid = { version = "=1.24.0", features = ["v7", "serde"] }
+
+[dev-dependencies]
+# `mock` gives the handlers a DatabaseConnection without a Postgres behind it,
+# so the HTTP contract - status codes, shapes, what a missing token does - is
+# testable with `cargo test` alone.
+sea-orm = { version = "=2.0.1", features = ["mock"] }
+# Assertion macros. Test-only, hence here rather than in [dependencies] - an
+# entry there would link it into the server binary as well.
+claims = "=0.8.0"
+http-body-util = "=0.1.4"
+tower = { version = "=0.5.3", features = ["util"] }
+
+[lints.rust]
+future_incompatible = "warn"
+nonstandard_style = "warn"
+rust_2018_idioms = "warn"
+rust_2018_compatibility = "warn"
+rust_2021_compatibility = "warn"
+unused = "warn"
+
+[lints.rustdoc]
+unescaped_backticks = "warn"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+wildcard_dependencies = "deny"
+
+missing_panics_doc = "warn"
+missing_const_for_fn = "warn"
+redundant_closure = "warn"
+needless_borrow = "warn"
+manual_ok_or = "warn"
+mutex_atomic = "deny"
+large_enum_variant = "warn"
+map_entry = "warn"
+similar_names = "warn"
+doc_markdown = "warn"
+needless_pass_by_value = "warn"
+doc_link_with_quotes = "warn"
+or_fun_call = "warn"
+range_plus_one = "warn"
+match_same_arms = "warn"

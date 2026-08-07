@@ -19,7 +19,7 @@
     "@types/node": "^26.1.0",
     "eslint": "^10.4.1",
     "prettier": "^3.8.4",
-    "typescript": "~7.0.2"
+    "typescript": "~5.9.0"
   },
   "allowScripts": {
     "fsevents@2.3.3": true,
