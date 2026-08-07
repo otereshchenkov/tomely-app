@@ -10,6 +10,7 @@ import { ReadingNowCard } from '#/components/dashboard/ReadingNowCard'
 import { EmptyLine, SectionCard } from '#/components/dashboard/SectionCard'
 import { StatTile } from '#/components/dashboard/StatTile'
 import { YearInBooksCard } from '#/components/dashboard/YearInBooksCard'
+import { LibraryChips } from '#/components/libraries/LibraryChips'
 import { useAuth } from '#/lib/auth'
 import { useDashboard } from '#/lib/dashboard'
 import { useLibraries } from '#/lib/libraries'
@@ -48,11 +49,16 @@ function DashboardContent() {
 
   return (
     <Stack gap="md">
+      {/* Nothing at all until the list arrives: a prompt to create your first
+          library that turns out to be wrong is worse than a moment of blank. */}
       {libraries?.length === 0 ? (
         <Group>
           <Button
-            component={Link}
-            to="/libraries"
+            // `?new` opens the create dialog on arrival, so this is one click
+            // rather than "go to libraries, now find the button".
+            renderRoot={(props) => (
+              <Link to="/libraries" search={{ new: true }} {...props} />
+            )}
             variant="default"
             radius="xl"
             size="compact-sm"
@@ -63,6 +69,8 @@ function DashboardContent() {
           </Button>
         </Group>
       ) : null}
+
+      {libraries?.length ? <LibraryChips libraries={libraries} /> : null}
 
       <Grid gap="md">
         <Grid.Col span={{ base: 12, md: 8 }}>

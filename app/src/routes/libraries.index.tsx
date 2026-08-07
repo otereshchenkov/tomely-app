@@ -1,5 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useDisclosure } from '@mantine/hooks'
+import { z } from 'zod'
 import {
   Alert,
   Button,
@@ -19,7 +21,19 @@ import { LibraryCard } from '#/components/libraries/LibraryCard'
 import { NewLibraryModal } from '#/components/libraries/NewLibraryModal'
 import { useLibraries } from '#/lib/libraries'
 
+/**
+ * `?new` opens the create dialog on arrival, so somewhere else can send you here
+ * to make one - the dashboard's "create your first library" does exactly that.
+ *
+ * `.catch` rather than a hard failure: a malformed value should mean "no dialog",
+ * not a broken page.
+ */
+const searchSchema = z.object({
+  new: z.boolean().optional().catch(undefined),
+})
+
 export const Route = createFileRoute('/libraries/')({
+  validateSearch: searchSchema,
   component: Libraries,
 })
 
@@ -32,9 +46,24 @@ export const Route = createFileRoute('/libraries/')({
  */
 function Libraries() {
   const [opened, { open, close }] = useDisclosure(false)
+  const { new: openOnArrival } = Route.useSearch()
+  const navigate = useNavigate()
   // Safe to call outside `RequireAuth` - the query does not run until the
   // session resolves - and it is what puts the count in the title bar.
   const { data: libraries } = useLibraries()
+
+  useEffect(() => {
+    if (openOnArrival) open()
+  }, [openOnArrival, open])
+
+  // Drop the search param on the way out, so reloading the page or coming back
+  // to it does not reopen a dialog the reader has already dismissed.
+  const closeAndForget = () => {
+    close()
+    if (openOnArrival) {
+      void navigate({ to: '/libraries', search: {}, replace: true })
+    }
+  }
 
   return (
     <>
@@ -56,7 +85,7 @@ function Libraries() {
         </RequireAuth>
       </AppLayout>
 
-      <NewLibraryModal opened={opened} onClose={close} />
+      <NewLibraryModal opened={opened} onClose={closeAndForget} />
     </>
   )
 }
