@@ -23,6 +23,10 @@ pub fn router(state: AppState) -> Router {
 struct Health {
     status: &'static str,
     database: &'static str,
+    /// The crate version. Public on purpose - the web app prints it next to its
+    /// own in the footer, so "which build is this?" has an answer that does not
+    /// involve a shell.
+    version: &'static str,
 }
 
 /// Liveness plus a real round trip to Postgres, so a healthy response means the
@@ -33,5 +37,6 @@ async fn health(State(state): State<AppState>) -> Result<Json<Health>, ApiError>
     Ok(Json(Health {
         status: "ok",
         database: "ok",
+        version: env!("CARGO_PKG_VERSION"),
     }))
 }

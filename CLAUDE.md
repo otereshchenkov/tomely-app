@@ -123,6 +123,32 @@ meant to arrive as new `provider` values, not as new columns on `users`.
 - Server state goes through TanStack Query. Prefetch in a route `loader` via
   `context.queryClient.ensureQueryData` so the data is in the server-rendered HTML.
 
+#### The signed-in shell
+
+`app/src/components/layout/AppLayout.tsx` is the frame every signed-in page hangs
+in: navigation on the left, a title bar across the top of the content, a version
+strip at the foot. A page renders `<AppLayout title=…>` and puts `RequireAuth`
+_inside_ it, so the shell is part of the server-rendered HTML and only the content
+waits for the client to work out who is asking.
+
+- `md` is the one breakpoint that matters. Below it the navigation is a `Drawer`
+  behind a burger and the content is a single column; above it the navbar is
+  permanent and the content splits. Mantine's own mobile navbar is full-width,
+  which reads as a page rather than as a menu, hence the separate drawer.
+- `AppNav` holds the destinations. Everything except the dashboard is a disabled
+  item marked "Soon" — the shape of the navigation is part of the design, and an
+  item that goes nowhere should say so rather than 404.
+- The colour-scheme control lives in the user panel, which only renders once the
+  session has resolved. That is deliberate: its label comes from `localStorage`,
+  so rendering it on the server would mean a hydration mismatch.
+
+#### The dashboard
+
+`app/src/lib/dashboard.ts` is the seam. It declares what the page shows and hands
+back an empty summary, so every card renders its empty state; the cards take their
+data as props and know nothing about where it comes from. When `GET /dashboard`
+exists, `useDashboard` becomes a query and nothing above it changes.
+
 ### Why SSR, and what it demands
 
 Public pages — shelf, book, author, series — get shared with people who have no
@@ -192,8 +218,9 @@ Root `.env` (see `.env.example`) — read by the API and by docker compose:
 
 Working: the compose Postgres, the migration CLI, the axum server, the `users` /
 `user_identities` schema, first-run setup, password sign-in, and a server-rendered
-web app with `/setup`, `/login` and a placeholder `/dashboard`.
+web app with `/setup`, `/login` and a `/dashboard` — the signed-in shell and the
+dashboard layout, drawn against an empty summary.
 
-Not built yet: every domain endpoint (books, shelves, authors, series), password
-change and user management, OIDC and passkey providers, and the Dockerfiles for the
-two services.
+Not built yet: every domain endpoint (books, shelves, authors, series) and so the
+data behind the dashboard, password change and user management, OIDC and passkey
+providers, and the Dockerfiles for the two services.
