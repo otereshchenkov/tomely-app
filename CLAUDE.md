@@ -55,10 +55,10 @@ One crate, `tomely-api`, with two binaries sharing `src/lib.rs`:
 | `src/main.rs`        | bin `server` — tracing, DB connect, router, CORS, `axum::serve` on `0.0.0.0:$PORT` |
 | `src/bin/migrate.rs` | bin `migrate` — `sea_orm_migration::cli::run_cli`                                  |
 | `src/db.rs`          | `connect()` — the pool, sized for a long-lived server                              |
-| `src/state.rs`       | `AppState { db }`, the axum `State`                                                |
+| `src/state.rs`       | `AppState { db, jwt }`, the axum `State`                                           |
 | `src/error.rs`       | `ApiError` + `IntoResponse` + `From<DbErr>`                                        |
 | `src/auth/`          | password hashing, JWT issue/verify, the `CurrentUser` extractor                    |
-| `src/routes/`        | the router; `/health`, `/setup*`, `/auth/*`                                        |
+| `src/routes/`        | the router; `/health`, `/setup*`, `/auth/*`, `/libraries*`                         |
 | `src/migrations/`    | schema migrations — the source of truth                                            |
 | `src/entities/`      | generated SeaORM entities — never hand-edit                                        |
 
@@ -112,6 +112,28 @@ meant to arrive as new `provider` values, not as new columns on `users`.
   auth in a route `beforeLoad`; the token does not exist there.
 - **Claims are a convenience, not an authority.** Anything acting on a user's current
   name, admin flag or active status reads the row — see `routes/auth.rs::me`.
+
+### Libraries and membership
+
+A library is the container everything else hangs off. Who may see one is a row in
+`library_memberships` and nothing else — there is deliberately no "instance admin
+sees everything" shortcut, because administering an instance is not the same as
+reading somebody's shelves. A non-member asking for a library by id gets a 404
+rather than a 403, so ids cannot be probed for.
+
+- **Roles are rows, not an enum.** `roles` ships with `owner`, `editor` and
+  `viewer` marked `is_system`, seeded by m0003 with fixed UUIDs so every instance
+  agrees on them. The API looks them up by name, so nothing in the code is coupled
+  to those ids. Users defining their own roles is the reason this is a table.
+- **The primary owner is recorded twice.** `libraries.owner_id` is the thing that
+  cannot be revoked; the same person also gets an ordinary membership with the
+  `owner` role and a null `invited_by` — nobody invited them. Permission checks
+  read the membership, so a primary owner and an owner are the same to everything
+  except `POST /libraries`. Keep it that way: the moment a check special-cases
+  `owner_id`, every future one has to as well.
+- `isPrimaryOwner` and `role` on the API's library responses are properties of the
+  _caller_, not of the row. That is what lets a card draw the crown without a
+  second request.
 
 ### Web app (`app/`)
 
@@ -219,8 +241,13 @@ Root `.env` (see `.env.example`) — read by the API and by docker compose:
 Working: the compose Postgres, the migration CLI, the axum server, the `users` /
 `user_identities` schema, first-run setup, password sign-in, and a server-rendered
 web app with `/setup`, `/login` and a `/dashboard` — the signed-in shell and the
-dashboard layout, drawn against an empty summary.
+dashboard layout, drawn against an empty summary. Libraries end to end: the
+`roles` / `libraries` / `library_memberships` schema, `GET`/`POST /libraries` and
+`GET /libraries/{id}`, and a `/libraries` page that lists and creates them.
 
-Not built yet: every domain endpoint (books, shelves, authors, series) and so the
-data behind the dashboard, password change and user management, OIDC and passkey
-providers, and the Dockerfiles for the two services.
+Not built yet: sharing a library — the roles and the membership table are there,
+but there is no endpoint to invite anyone, so every membership is its owner's.
+Renaming or deleting a library. Every other domain endpoint (books, shelves,
+authors, series) and so the data behind the dashboard and behind
+`/libraries/{id}/books`, which is a stub. Password change and user management,
+OIDC and passkey providers, and the Dockerfiles for the two services.

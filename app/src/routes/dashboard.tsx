@@ -1,14 +1,6 @@
 import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import {
-  Button,
-  Grid,
-  Group,
-  SimpleGrid,
-  Stack,
-  Text,
-  Tooltip,
-} from '@mantine/core'
+import { Link, createFileRoute } from '@tanstack/react-router'
+import { Button, Grid, Group, SimpleGrid, Stack, Text } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react'
 
 import { AppLayout } from '#/components/layout/AppLayout'
@@ -20,6 +12,7 @@ import { StatTile } from '#/components/dashboard/StatTile'
 import { YearInBooksCard } from '#/components/dashboard/YearInBooksCard'
 import { useAuth } from '#/lib/auth'
 import { useDashboard } from '#/lib/dashboard'
+import { useLibraries } from '#/lib/libraries'
 
 export const Route = createFileRoute('/dashboard')({
   component: Dashboard,
@@ -49,28 +42,25 @@ function DashboardContent() {
   const [now] = useState(() => new Date())
   const dashboard = useDashboard(now)
   const { stats } = dashboard
+  // The real count, not the summary's: libraries have their own endpoint now,
+  // and two sources for one number is how they drift apart.
+  const { data: libraries } = useLibraries()
 
   return (
     <Stack gap="md">
-      {dashboard.libraryCount === 0 ? (
+      {libraries?.length === 0 ? (
         <Group>
-          <Tooltip label="Libraries are not built yet" withArrow>
-            <Button
-              variant="default"
-              radius="xl"
-              size="compact-sm"
-              leftSection={<IconPlus size={14} />}
-              style={{ borderStyle: 'dashed' }}
-              // `data-disabled` rather than `disabled`, so the tooltip
-              // explaining why still opens; `aria-disabled` says the same thing
-              // to anyone not using a pointer.
-              data-disabled
-              aria-disabled
-              onClick={(event) => event.preventDefault()}
-            >
-              Create your first library
-            </Button>
-          </Tooltip>
+          <Button
+            component={Link}
+            to="/libraries"
+            variant="default"
+            radius="xl"
+            size="compact-sm"
+            leftSection={<IconPlus size={14} />}
+            style={{ borderStyle: 'dashed' }}
+          >
+            Create your first library
+          </Button>
         </Group>
       ) : null}
 
