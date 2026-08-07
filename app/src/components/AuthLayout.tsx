@@ -1,4 +1,6 @@
-import { Card, Center, Image, Stack, Text, Title } from '@mantine/core'
+import { Box, Card, Center, Stack, Text, Title } from '@mantine/core'
+
+import { Mark } from './Mark'
 
 import type { ReactNode } from 'react'
 
@@ -22,19 +24,13 @@ export function AuthLayout({
       <Stack gap="lg" w="100%" maw={480}>
         <Stack gap="xs" align="center">
           {/*
-            The source icon carries a wide transparent margin - the mark itself
-            is a little under half its width - so the box has to be roughly
-            double the size the logo should look, and the negative margin takes
-            back the vertical space that margin would otherwise add.
+            The mark sits in about the middle three fifths of its own box, so a
+            120px box draws it at roughly 75px; the negative margin takes back
+            the transparent strip above and below it.
           */}
-          <Image
-            src="/android-chrome-512x512.png"
-            alt=""
-            w={160}
-            h={160}
-            my={-38}
-            fit="contain"
-          />
+          <Box my={-18}>
+            <Mark size={120} />
+          </Box>
           <Title order={1} ta="center">
             {title}
           </Title>

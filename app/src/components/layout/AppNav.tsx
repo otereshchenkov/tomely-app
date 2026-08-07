@@ -5,11 +5,9 @@ import {
   Box,
   Divider,
   Group,
-  Image,
   NavLink,
   Stack,
   Text,
-  ThemeIcon,
   Tooltip,
   UnstyledButton,
   useMantineColorScheme,
@@ -26,6 +24,7 @@ import {
   IconUsers,
 } from '@tabler/icons-react'
 
+import { Mark } from '#/components/Mark'
 import { useAuth } from '#/lib/auth'
 
 import type { MantineColorScheme } from '@mantine/core'
@@ -76,15 +75,7 @@ const sections: NavSection[] = [
 export function Brand() {
   return (
     <Group gap="xs" wrap="nowrap">
-      <ThemeIcon variant="transparent" size="md">
-        <Image
-          src="/logo-light.png"
-          alt="logo"
-          w={26}
-          h={26}
-        />
-        <IconBooks size={26} stroke={1.8} />
-      </ThemeIcon>
+      <Mark size={30} />
       <Text fw={700} fz="lg" lh={1}>
         Tomely
       </Text>
