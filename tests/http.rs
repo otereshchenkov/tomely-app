@@ -11,6 +11,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use chrono::Utc;
+use claims::assert_ok;
 use http_body_util::BodyExt;
 use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
 use serde_json::{Value, json};
@@ -57,30 +58,42 @@ fn app(query_results: Vec<Vec<users::Model>>) -> Router {
 }
 
 async fn send(app: Router, request: Request<Body>) -> (StatusCode, Value) {
-    let response = app.oneshot(request).await.unwrap();
+    let response = assert_ok!(app.oneshot(request).await);
     let status = response.status();
-    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body = assert_ok!(response.into_body().collect().await).to_bytes();
 
+    // Every route in this app answers with JSON, including the error paths.
     let json = if body.is_empty() {
         Value::Null
     } else {
-        serde_json::from_slice(&body).expect("every response is JSON")
+        assert_ok!(serde_json::from_slice(&body))
     };
 
     (status, json)
 }
 
 fn get(path: &str) -> Request<Body> {
-    Request::builder().uri(path).body(Body::empty()).unwrap()
+    assert_ok!(Request::builder().uri(path).body(Body::empty()))
 }
 
-fn post(path: &str, body: Value) -> Request<Body> {
-    Request::builder()
-        .method("POST")
-        .uri(path)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(body.to_string()))
-        .unwrap()
+/// A GET carrying a bearer token.
+fn get_with_token(path: &str, token: &str) -> Request<Body> {
+    assert_ok!(
+        Request::builder()
+            .uri(path)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+    )
+}
+
+fn post(path: &str, body: &Value) -> Request<Body> {
+    assert_ok!(
+        Request::builder()
+            .method("POST")
+            .uri(path)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+    )
 }
 
 #[tokio::test]
@@ -113,7 +126,7 @@ async fn setup_rejects_a_short_password() {
         app(vec![]),
         post(
             "/setup",
-            json!({
+            &json!({
                 "displayName": "Jane Doe",
                 "email": "jane@example.com",
                 "password": "short",
@@ -133,7 +146,7 @@ async fn setup_rejects_a_nonsense_email() {
         app(vec![]),
         post(
             "/setup",
-            json!({
+            &json!({
                 "displayName": "Jane Doe",
                 "email": "not-an-email",
                 "password": "a good password",
@@ -152,7 +165,7 @@ async fn setup_rejects_a_blank_display_name() {
         app(vec![]),
         post(
             "/setup",
-            json!({
+            &json!({
                 "displayName": "   ",
                 "email": "jane@example.com",
                 "password": "a good password",
@@ -176,31 +189,20 @@ async fn me_refuses_a_caller_with_no_token() {
 
 #[tokio::test]
 async fn me_refuses_a_token_that_is_not_one() {
-    let request = Request::builder()
-        .uri("/auth/me")
-        .header(header::AUTHORIZATION, "Bearer nonsense")
-        .body(Body::empty())
-        .unwrap();
-
-    let (status, _) = send(app(vec![]), request).await;
+    let (status, _) = send(app(vec![]), get_with_token("/auth/me", "nonsense")).await;
 
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
 async fn me_refuses_a_token_signed_with_a_different_secret() {
-    let forged = JwtKeys::new("not-our-secret")
-        .issue(&a_user(), false)
-        .unwrap()
-        .0;
+    let (forged, _) = assert_ok!(JwtKeys::new("not-our-secret").issue(&a_user(), false));
 
-    let request = Request::builder()
-        .uri("/auth/me")
-        .header(header::AUTHORIZATION, format!("Bearer {forged}"))
-        .body(Body::empty())
-        .unwrap();
-
-    let (status, _) = send(app(vec![vec![a_user()]]), request).await;
+    let (status, _) = send(
+        app(vec![vec![a_user()]]),
+        get_with_token("/auth/me", &forged),
+    )
+    .await;
 
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
@@ -208,15 +210,13 @@ async fn me_refuses_a_token_signed_with_a_different_secret() {
 #[tokio::test]
 async fn me_returns_the_user_behind_a_valid_token() {
     let user = a_user();
-    let token = JwtKeys::new(SECRET).issue(&user, false).unwrap().0;
+    let (token, _) = assert_ok!(JwtKeys::new(SECRET).issue(&user, false));
 
-    let request = Request::builder()
-        .uri("/auth/me")
-        .header(header::AUTHORIZATION, format!("Bearer {token}"))
-        .body(Body::empty())
-        .unwrap();
-
-    let (status, body) = send(app(vec![vec![user.clone()]]), request).await;
+    let (status, body) = send(
+        app(vec![vec![user.clone()]]),
+        get_with_token("/auth/me", &token),
+    )
+    .await;
 
     assert_eq!(status, StatusCode::OK);
     // camelCase, and no hint of the credentials table.
@@ -236,16 +236,10 @@ async fn me_refuses_a_valid_token_for_a_deactivated_user() {
     // The token is still perfectly good; the account behind it is not. This is
     // why /auth/me re-reads the row instead of trusting the claims.
     let mut user = a_user();
-    let token = JwtKeys::new(SECRET).issue(&user, false).unwrap().0;
+    let (token, _) = assert_ok!(JwtKeys::new(SECRET).issue(&user, false));
     user.is_active = false;
 
-    let request = Request::builder()
-        .uri("/auth/me")
-        .header(header::AUTHORIZATION, format!("Bearer {token}"))
-        .body(Body::empty())
-        .unwrap();
-
-    let (status, _) = send(app(vec![vec![user]]), request).await;
+    let (status, _) = send(app(vec![vec![user]]), get_with_token("/auth/me", &token)).await;
 
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
@@ -256,7 +250,7 @@ async fn login_gives_an_unknown_address_nothing_to_go_on() {
         app(vec![vec![]]),
         post(
             "/auth/login",
-            json!({ "email": "nobody@example.com", "password": "whatever" }),
+            &json!({ "email": "nobody@example.com", "password": "whatever" }),
         ),
     )
     .await;

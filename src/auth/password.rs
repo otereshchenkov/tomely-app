@@ -4,25 +4,11 @@
 //! string carries its own salt, algorithm and cost parameters, so the cost can be
 //! raised later and old hashes keep verifying without a schema change.
 
-use std::sync::LazyLock;
-
 use argon2::Argon2;
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 
 use crate::error::ApiError;
-
-/// A real Argon2id hash of a password no account has.
-///
-/// Login verifies against this when the email is unknown, so an unregistered
-/// address costs the same time as a registered one and a timing difference
-/// cannot be used to enumerate accounts. Computed once on first use rather than
-/// written out as a literal, so it can never drift out of the format the
-/// current parameters produce.
-static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
-    hash_password("bb0d0b4e-6b1a-4d0f-9d3e-nobody-has-this")
-        .expect("hashing a constant cannot fail unless the OS RNG is broken")
-});
 
 /// Hash a password for storage in `user_identities.credentials`.
 pub fn hash_password(password: &str) -> Result<String, ApiError> {
@@ -52,14 +38,23 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
 /// Spend the same time a real verification would, and learn nothing.
 ///
 /// Called on the login path when no account matches, so that "no such email"
-/// and "wrong password" cost the same.
+/// costs the same as "wrong password" and the difference cannot be timed to
+/// enumerate which addresses have accounts.
+///
+/// Hashing rather than verifying against a stored dummy: `verify_password` runs
+/// the same single Argon2 pass with the same default parameters, so the cost
+/// matches, and this way there is no fallible constant to build and keep in step
+/// with the current parameters.
 pub fn verify_dummy_password(password: &str) {
-    let _ = verify_password(password, &DUMMY_HASH);
+    let _ = hash_password(password);
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use claims::assert_ok;
+
     use super::*;
 
     #[test]
@@ -103,10 +98,25 @@ mod tests {
     }
 
     #[test]
-    fn the_dummy_hash_is_well_formed() {
-        // If this stopped parsing, `verify_password` would bail out early and
-        // reintroduce the timing difference the dummy hash exists to remove.
-        assert!(PasswordHash::new(DUMMY_HASH.as_str()).is_ok());
-        verify_dummy_password("anything");
+    fn the_dummy_path_costs_what_a_real_verification_costs() {
+        // The point of `verify_dummy_password` is entirely its cost: if it ever
+        // became a no-op, an unknown email would return measurably faster than a
+        // wrong password and the pair could be used to enumerate accounts. Only
+        // the clock can catch that, so the bound is deliberately loose - it is
+        // there to catch "does no work at all", not to measure anything.
+        let hash = assert_ok!(hash_password("a real password"));
+
+        let started = Instant::now();
+        verify_password("a real password", &hash);
+        let real = started.elapsed();
+
+        let started = Instant::now();
+        verify_dummy_password("a real password");
+        let dummy = started.elapsed();
+
+        assert!(
+            dummy * 4 >= real,
+            "the dummy path took {dummy:?} against a real {real:?} - it is not doing the work"
+        );
     }
 }

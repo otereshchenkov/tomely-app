@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// In development the web app is same-origin (the Vite dev server proxies /api
 /// here), so CORS never comes up. It matters once the two run as separate
-/// containers on separate origins - hence CORS_ORIGIN.
+/// containers on separate origins - hence `CORS_ORIGIN`.
 fn cors_layer() -> Result<CorsLayer, Box<dyn std::error::Error>> {
     let layer = CorsLayer::new()
         .allow_methods([

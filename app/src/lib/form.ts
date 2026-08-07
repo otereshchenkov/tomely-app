@@ -17,7 +17,7 @@ export function useFieldErrors(form: AnyFormApi) {
   const fieldMeta = useStore(form.store, (state) => state.fieldMeta)
 
   return (name: string): string | undefined => {
-    const error = fieldMeta[name]?.errors?.[0] as
+    const error = fieldMeta[name]?.errors[0] as
       { message?: string } | string | undefined
 
     if (!error) return undefined

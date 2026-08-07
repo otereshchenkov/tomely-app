@@ -162,6 +162,12 @@ API's public origin; that is when the axum `CorsLayer` (`CORS_ORIGIN`) matters.
 - No semicolons, single quotes, trailing commas (Prettier, config at the root).
 - ESLint extends `@tanstack/eslint-config` with relaxed import ordering.
 - Import alias `#/*` → `./src/*`.
+- **TypeScript is pinned to 5.9 on purpose.** On 7.x, `npm run lint` does not run at
+  all: `ts-api-utils` reads `ts.TypeFlags` at module load, TypeScript 7 does not
+  expose it, and every ESLint invocation dies before linting a single file. There is
+  no released `typescript-eslint` that supports 7 yet. Nothing in the codebase needs
+  7 — `tsc`, the Vite build and the tests all pass identically on 5.9. Lift the pin
+  once `typescript-eslint` ships TypeScript 7 support, not before.
 
 ### Rust
 

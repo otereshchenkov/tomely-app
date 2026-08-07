@@ -119,10 +119,10 @@ impl JwtKeys {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use claims::{assert_err, assert_ok};
+    use claims::{assert_err, assert_ok, assert_some};
 
     fn user() -> users::Model {
-        let now = Utc.with_ymd_and_hms(2026, 8, 7, 12, 0, 0).unwrap().into();
+        let now = assert_some!(Utc.with_ymd_and_hms(2026, 8, 7, 12, 0, 0).single()).into();
 
         users::Model {
             id: Uuid::now_v7(),
