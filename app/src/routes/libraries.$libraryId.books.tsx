@@ -3,6 +3,7 @@ import { Alert, Card, Center, Loader, Text } from '@mantine/core'
 
 import { AppLayout } from '#/components/layout/AppLayout'
 import { RequireAuth } from '#/components/RequireAuth'
+import { LibraryBreadcrumbs } from '#/components/libraries/LibraryBreadcrumbs'
 import { useLibrary } from '#/lib/libraries'
 
 export const Route = createFileRoute('/libraries/$libraryId/books')({
@@ -21,7 +22,10 @@ function LibraryBooks() {
   const { data: library } = useLibrary(libraryId)
 
   return (
-    <AppLayout title={library?.name ?? 'Library'} subtitle="Books">
+    <AppLayout
+      breadcrumbs={<LibraryBreadcrumbs library={library} current="Books" />}
+      title="Books"
+    >
       <RequireAuth>
         <LibraryBooksContent />
       </RequireAuth>

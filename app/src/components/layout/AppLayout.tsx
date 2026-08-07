@@ -32,11 +32,15 @@ import type { ReactNode } from 'react'
  */
 export function AppLayout({
   title,
+  breadcrumbs,
   subtitle,
   actions,
   children,
 }: Readonly<{
   title: ReactNode
+  /** A trail above the heading, for a page that sits inside something else.
+   *  Above rather than below, because it is the way back out. */
+  breadcrumbs?: ReactNode
   /** A line under the heading - a count, a section name. Outside the `<h1>` on
    *  purpose: it is context, not part of the page's name. */
   subtitle?: ReactNode
@@ -96,6 +100,7 @@ export function AppLayout({
             gap="sm"
           >
             <Stack gap={2} miw={0}>
+              {breadcrumbs}
               <Title order={1} fz="h4" lh={1.3} lineClamp={1}>
                 {title}
               </Title>
