@@ -36,6 +36,8 @@ import {
 import { Mark } from '#/components/Mark'
 import { useAuth } from '#/lib/auth'
 
+import classes from './AppNav.module.css'
+
 import type { MantineColorScheme } from '@mantine/core'
 import type { TablerIcon } from '@tabler/icons-react'
 import type { LinkProps } from '@tanstack/react-router'
@@ -53,10 +55,12 @@ interface NavItem {
    * The pathname this item is "at", for deciding whether it is the current one.
    * Written out rather than derived, because a `to` like
    * `/libraries/$libraryId/books` is a template and never equals a real pathname.
+   *
+   * Matched exactly. "Libraries" stays unhighlighted while you are inside one,
+   * because the child row you are actually on is the one lit up, and two
+   * highlights would leave neither meaning anything.
    */
   activePath: string | null
-  /** Highlight when the pathname sits *underneath* this item, not only on it. */
-  matchNested?: boolean
   /** Rendered indented beneath the item, for a section of the app you are
    *  currently inside. */
   children?: NavItem[]
@@ -93,7 +97,6 @@ function sectionsFor(libraryId: string | undefined): NavSection[] {
           icon: IconLibrary,
           link: linkOptions({ to: '/libraries' }),
           activePath: '/libraries',
-          matchNested: true,
           children: libraryId
             ? [
                 {
@@ -132,12 +135,7 @@ function sectionsFor(libraryId: string | undefined): NavSection[] {
 
 /** Whether `item` is the page currently being looked at. */
 function isActive(item: NavItem, pathname: string): boolean {
-  const path = item.activePath
-
-  if (!path) return false
-  if (pathname === path) return true
-
-  return Boolean(item.matchNested) && pathname.startsWith(`${path}/`)
+  return item.activePath !== null && pathname === item.activePath
 }
 
 /** The wordmark, shared by the navbar, the mobile header and the drawer. */
@@ -155,9 +153,14 @@ export function Brand() {
 /**
  * One row of the navigation, and whatever hangs under it.
  *
- * An item with no `to` is not built yet and says so rather than 404ing. An item
- * with children is always shown open: the children appear because you are
- * already inside that part of the app, so there is nothing to expand.
+ * An item with no `link` is not built yet and says so rather than 404ing.
+ *
+ * Children are rendered as siblings in an indented group, *not* through
+ * Mantine's own `NavLink` nesting. A `NavLink` with children calls
+ * `event.preventDefault()` on every click so it can toggle its collapse
+ * instead - which would make "Libraries" un-clickable exactly when you are
+ * inside a library. There is nothing to toggle here anyway: the children are
+ * showing because of where you are, not because anyone opened them.
  */
 function NavItemLink({
   item,
@@ -168,63 +171,62 @@ function NavItemLink({
   item: NavItem
   pathname: string
   onNavigate?: () => void
-  /** A child row. Highlighted with colour alone, so the filled parent and the
+  /** A child row. Highlighted with colour alone, so a filled parent and the
    *  current child do not merge into one block. */
   nested?: boolean
 }>) {
-  const children = item.children?.length ? (
-    <>
-      {item.children.map((child) => (
-        <NavItemLink
-          key={child.label}
-          item={child}
-          pathname={pathname}
-          onNavigate={onNavigate}
-          nested
-        />
-      ))}
-    </>
-  ) : null
-
-  if (!item.link) {
-    return (
-      <NavLink
-        component="button"
-        type="button"
-        label={item.label}
-        leftSection={<item.icon size={18} stroke={1.6} />}
-        rightSection={
-          <Badge size="xs" variant="default" fw={500}>
-            Soon
-          </Badge>
-        }
-        disabled
-      />
-    )
-  }
-
   const link = item.link
 
   return (
-    <NavLink
-      // `renderRoot` rather than `component={Link}`: Mantine's polymorphic prop
-      // erases Link's own generics, and with them the check that `params`
-      // matches the route's `$placeholders`.
-      renderRoot={(props) => <Link {...link} {...props} />}
-      label={item.label}
-      variant={nested ? 'subtle' : 'light'}
-      leftSection={<item.icon size={18} stroke={1.6} />}
-      active={isActive(item, pathname)}
-      onClick={onNavigate}
-      // Always open, and no chevron: the children are context, not a menu the
-      // reader opened. Without this Mantine renders a rotating caret that does
-      // nothing.
-      opened={Boolean(children)}
-      childrenOffset={28}
-      rightSection={null}
-    >
-      {children}
-    </NavLink>
+    <>
+      {link ? (
+        <NavLink
+          // `renderRoot` rather than `component={Link}`: Mantine's polymorphic
+          // prop erases Link's own generics, and with them the check that
+          // `params` matches the route's `$placeholders`.
+          //
+          // `exact` because Mantine styles `aria-current="page"` exactly as it
+          // styles `data-active`, and Link sets it on prefix matches by
+          // default - which lit "Libraries" up from inside a library, on top of
+          // the child row that was genuinely current.
+          renderRoot={(props) => (
+            <Link {...link} activeOptions={{ exact: true }} {...props} />
+          )}
+          label={item.label}
+          variant={nested ? 'subtle' : 'light'}
+          leftSection={<item.icon size={18} stroke={1.6} />}
+          active={isActive(item, pathname)}
+          onClick={onNavigate}
+        />
+      ) : (
+        <NavLink
+          component="button"
+          type="button"
+          label={item.label}
+          leftSection={<item.icon size={18} stroke={1.6} />}
+          rightSection={
+            <Badge size="xs" variant="default" fw={500}>
+              Soon
+            </Badge>
+          }
+          disabled
+        />
+      )}
+
+      {item.children?.length ? (
+        <Box className={classes.children}>
+          {item.children.map((child) => (
+            <NavItemLink
+              key={child.label}
+              item={child}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              nested
+            />
+          ))}
+        </Box>
+      ) : null}
+    </>
   )
 }
 

@@ -1,0 +1,8 @@
+/* The rows belonging to the library you have open.
+   Indented to sit under the parent's icon, with a rule down the side so the
+   group reads as one thing rather than as more top-level destinations. */
+.children {
+  margin-inline-start: 26px;
+  border-inline-start: 1px solid
+    light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+}
