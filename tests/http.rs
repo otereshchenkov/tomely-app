@@ -96,6 +96,24 @@ fn post(path: &str, body: &Value) -> Request<Body> {
     )
 }
 
+/// A POST carrying a bearer token.
+fn post_with_token(path: &str, token: &str, body: &Value) -> Request<Body> {
+    assert_ok!(
+        Request::builder()
+            .method("POST")
+            .uri(path)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::from(body.to_string()))
+    )
+}
+
+/// A token for `a_user()`, for the routes that only care that there is one.
+fn a_token() -> String {
+    let (token, _) = assert_ok!(JwtKeys::new(SECRET).issue(&a_user(), false));
+    token
+}
+
 #[tokio::test]
 async fn setup_status_reports_an_empty_instance_as_unconfigured() {
     let (status, body) = send(app(vec![vec![]]), get("/setup/status")).await;
@@ -259,6 +277,48 @@ async fn login_gives_an_unknown_address_nothing_to_go_on() {
     // Deliberately the same message a wrong password gets, so the response
     // cannot be used to find out which addresses have accounts.
     assert_eq!(body["message"], "Invalid email or password");
+}
+
+#[tokio::test]
+async fn libraries_are_not_listed_to_a_caller_with_no_token() {
+    // Access to a library is a membership row, and an anonymous caller has none.
+    let (status, body) = send(app(vec![]), get("/libraries")).await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["message"], "Not authenticated");
+}
+
+#[tokio::test]
+async fn creating_a_library_needs_a_token() {
+    let (status, _) = send(app(vec![]), post("/libraries", &json!({ "name": "Loft" }))).await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn a_library_needs_a_name() {
+    let (status, body) = send(
+        app(vec![]),
+        post_with_token("/libraries", &a_token(), &json!({ "name": "   " })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["message"], "Name is required");
+}
+
+#[tokio::test]
+async fn a_library_the_caller_is_not_in_does_not_exist_as_far_as_they_know() {
+    // No membership row, so the join comes back empty. A 404 rather than a 403:
+    // a stranger should not be able to probe for which ids are real.
+    let (status, body) = send(
+        app(vec![vec![]]),
+        get_with_token(&format!("/libraries/{}", Uuid::now_v7()), &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["error"], "NotFound");
 }
 
 #[tokio::test]
