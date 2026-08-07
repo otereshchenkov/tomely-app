@@ -1,0 +1,36 @@
+/*
+ * The page sits on a tinted background so that the cards - which use the plain
+ * body colour - read as raised surfaces rather than as outlined boxes.
+ */
+.main {
+  background-color: light-dark(
+    var(--mantine-color-gray-0),
+    var(--mantine-color-dark-8)
+  );
+}
+
+/*
+ * The title bar at the top of the main column. Full-bleed and on the body
+ * colour, so it continues the header on mobile and the navbar's top edge on a
+ * wide screen.
+ */
+.pageHeader {
+  background-color: var(--mantine-color-body);
+  border-bottom: 1px solid
+    light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+}
+
+/* The mobile navigation drawer: a column, so the user panel can sit at its foot
+   exactly as it does in the navbar. */
+.drawerContent {
+  display: flex;
+  flex-direction: column;
+}
+
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+}

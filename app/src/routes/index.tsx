@@ -1,19 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { Anchor, Code, Container, Stack, Text, Title } from '@mantine/core'
 
 import { ApiUnreachable } from '../components/ApiUnreachable'
-import { apiFetch } from '../lib/api'
-
-interface Health {
-  status: string
-  database: string
-}
-
-const healthQuery = queryOptions({
-  queryKey: ['health'],
-  queryFn: () => apiFetch<Health>('/health'),
-})
+import { healthQuery } from '../lib/health'
 
 export const Route = createFileRoute('/')({
   // Runs on the server for the initial request, so the payload below is in the

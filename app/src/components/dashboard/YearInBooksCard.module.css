@@ -1,0 +1,25 @@
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 44px;
+}
+
+.bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px;
+  background-color: light-dark(
+    var(--mantine-color-indigo-4),
+    var(--mantine-color-indigo-6)
+  );
+}
+
+/* A month with nothing in it is still a month: it keeps its slot as a hairline
+   so the twelve steps along the bottom stay legible. */
+.empty {
+  background-color: light-dark(
+    var(--mantine-color-gray-3),
+    var(--mantine-color-dark-4)
+  );
+}

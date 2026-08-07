@@ -266,5 +266,12 @@ async fn health_still_works() {
     let (status, body) = send(app(vec![]), get("/health")).await;
 
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({ "status": "ok", "database": "ok" }));
+    assert_eq!(
+        body,
+        json!({
+            "status": "ok",
+            "database": "ok",
+            "version": env!("CARGO_PKG_VERSION"),
+        })
+    );
 }
