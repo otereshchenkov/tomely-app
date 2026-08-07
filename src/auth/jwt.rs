@@ -119,6 +119,7 @@ impl JwtKeys {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use claims::{assert_err, assert_ok};
 
     fn user() -> users::Model {
         let now = Utc.with_ymd_and_hms(2026, 8, 7, 12, 0, 0).unwrap().into();
@@ -140,8 +141,8 @@ mod tests {
         let keys = JwtKeys::new("a-test-secret");
         let user = user();
 
-        let (token, expires_at) = keys.issue(&user, false).unwrap();
-        let claims = keys.verify(&token).unwrap();
+        let (token, expires_at) = assert_ok!(keys.issue(&user, false));
+        let claims = assert_ok!(keys.verify(&token));
 
         assert_eq!(claims.sub, user.id);
         assert_eq!(claims.email, "jane@example.com");
@@ -155,8 +156,8 @@ mod tests {
         let keys = JwtKeys::new("a-test-secret");
         let user = user();
 
-        let (_, session) = keys.issue(&user, false).unwrap();
-        let (_, remembered) = keys.issue(&user, true).unwrap();
+        let (_, session) = assert_ok!(keys.issue(&user, false));
+        let (_, remembered) = assert_ok!(keys.issue(&user, true));
 
         assert!(remembered > session);
         assert!(remembered - Utc::now() > Duration::days(29));
@@ -168,9 +169,9 @@ mod tests {
         let ours = JwtKeys::new("a-test-secret");
         let theirs = JwtKeys::new("a-different-secret");
 
-        let (token, _) = theirs.issue(&user(), false).unwrap();
+        let (token, _) = assert_ok!(theirs.issue(&user(), false));
 
-        let err = ours.verify(&token).unwrap_err();
+        let err = assert_err!(ours.verify(&token));
         assert!(matches!(err, ApiError::Unauthorized(_)));
     }
 
@@ -188,9 +189,9 @@ mod tests {
             iat: (Utc::now() - Duration::hours(2)).timestamp(),
             exp: (Utc::now() - Duration::hours(1)).timestamp(),
         };
-        let token = encode(&Header::default(), &expired, &keys.encoding).unwrap();
+        let token = assert_ok!(encode(&Header::default(), &expired, &keys.encoding));
 
-        let err = keys.verify(&token).unwrap_err();
+        let err = assert_err!(keys.verify(&token));
         assert!(matches!(err, ApiError::Unauthorized(m) if m == "Session expired"));
     }
 
@@ -198,7 +199,7 @@ mod tests {
     fn gibberish_is_rejected() {
         let keys = JwtKeys::new("a-test-secret");
 
-        assert!(keys.verify("not-a-token").is_err());
-        assert!(keys.verify("").is_err());
+        assert_err!(keys.verify("not-a-token"));
+        assert_err!(keys.verify(""));
     }
 }

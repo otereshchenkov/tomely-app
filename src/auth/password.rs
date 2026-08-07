@@ -59,18 +59,19 @@ pub fn verify_dummy_password(password: &str) {
 
 #[cfg(test)]
 mod tests {
+    use claims::assert_ok;
     use super::*;
 
     #[test]
     fn a_hash_verifies_against_its_own_password() {
-        let hash = hash_password("correct horse battery staple").unwrap();
+        let hash = assert_ok!(hash_password("correct horse battery staple"));
 
         assert!(verify_password("correct horse battery staple", &hash));
     }
 
     #[test]
     fn a_wrong_password_does_not_verify() {
-        let hash = hash_password("correct horse battery staple").unwrap();
+        let hash = assert_ok!(hash_password("correct horse battery staple"));
 
         assert!(!verify_password("Correct horse battery staple", &hash));
         assert!(!verify_password("", &hash));
@@ -80,8 +81,8 @@ mod tests {
     fn the_same_password_hashes_differently_every_time() {
         // i.e. the salt is doing its job - two users with the same password must
         // not share a hash.
-        let first = hash_password("hunter2hunter2").unwrap();
-        let second = hash_password("hunter2hunter2").unwrap();
+        let first = assert_ok!(hash_password("hunter2hunter2"));
+        let second = assert_ok!(hash_password("hunter2hunter2"));
 
         assert_ne!(first, second);
         assert!(verify_password("hunter2hunter2", &first));
@@ -90,7 +91,7 @@ mod tests {
 
     #[test]
     fn a_hash_is_a_phc_string() {
-        let hash = hash_password("hunter2hunter2").unwrap();
+        let hash = assert_ok!(hash_password("hunter2hunter2"));
 
         assert!(hash.starts_with("$argon2id$"), "unexpected hash: {hash}");
     }

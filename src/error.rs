@@ -23,7 +23,7 @@ pub enum ApiError {
 }
 
 impl ApiError {
-    fn status(&self) -> StatusCode {
+    const fn status(&self) -> StatusCode {
         match self {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
@@ -33,7 +33,7 @@ impl ApiError {
         }
     }
 
-    fn kind(&self) -> &'static str {
+    const fn kind(&self) -> &'static str {
         match self {
             Self::BadRequest(_) => "BadRequest",
             Self::Unauthorized(_) => "Unauthorized",

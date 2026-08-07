@@ -2,7 +2,7 @@
 
 Guidance for Claude Code (claude.ai/code) when working in this repository.
 
-## Project overview
+## Project Overview
 
 Tomely is a private home-library application. It was previously built as a SaaS on
 AWS (SST, Lambda, Aurora, API Gateway, CloudFront, Clerk); that stack has been
@@ -13,7 +13,7 @@ in the `main` branch's history if you need to see how something used to work.
   Mantine v9, server-rendered, built by Nitro to a plain Node server.
 - **API** (`src/`) — a single Rust crate at the repository root: axum + SeaORM.
 - **Database** — Postgres, run locally via `docker-compose.yml`.
-- **Auth** — local accounts, JWT bearer tokens. Clerk is gone, not ported.
+- **Auth** — local accounts, JWT bearer tokens.
 
 Both halves are meant to run as containers eventually. Nothing here should
 reintroduce a dependency on a specific cloud provider.
