@@ -8,6 +8,8 @@
  * - In the browser it is a same-origin `/api` path in dev (proxied by Vite) or
  *   the API's public origin in production, baked in at build time as VITE_API_URL.
  */
+import { getToken } from './token'
+
 function baseUrl(): string {
   if (import.meta.env.SSR) {
     return process.env.API_INTERNAL_URL ?? 'http://localhost:8080'
@@ -29,10 +31,16 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  // Only ever present in the browser - `getToken` returns null under SSR - so
+  // server-rendered requests are anonymous whether or not the caller thought
+  // about it. What a 401 means is the auth layer's business, not this one's.
+  const token = getToken()
+
   const response = await fetch(`${baseUrl()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   })

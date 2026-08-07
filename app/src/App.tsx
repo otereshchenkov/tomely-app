@@ -3,6 +3,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools'
 
+import { AuthProvider } from './lib/auth'
 import { theme } from './theme'
 
 import '@mantine/core/styles.css'
@@ -17,7 +18,7 @@ import './styles.css'
 export function App({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <MantineProvider theme={theme} defaultColorScheme="auto">
-      {children}
+      <AuthProvider>{children}</AuthProvider>
       <TanStackDevtools
         config={{ position: 'bottom-right' }}
         plugins={[

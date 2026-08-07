@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError, apiFetch } from './api'
+import { setToken } from './token'
 
 function mockFetch(response: Response) {
   const fetchMock = vi.fn().mockResolvedValue(response)
@@ -8,8 +9,14 @@ function mockFetch(response: Response) {
   return fetchMock
 }
 
+function headersOf(fetchMock: ReturnType<typeof mockFetch>) {
+  return new Headers(fetchMock.mock.calls[0][1].headers)
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  window.localStorage.clear()
+  window.sessionStorage.clear()
 })
 
 describe('apiFetch', () => {
@@ -50,5 +57,22 @@ describe('apiFetch', () => {
     await expect(apiFetch('/health')).rejects.toThrow(
       new ApiError(502, '502 Bad Gateway'),
     )
+  })
+
+  it('sends the stored token as a bearer credential', async () => {
+    setToken('jwt-abc', true)
+    const fetchMock = mockFetch(new Response('{}', { status: 200 }))
+
+    await apiFetch('/auth/me')
+
+    expect(headersOf(fetchMock).get('Authorization')).toBe('Bearer jwt-abc')
+  })
+
+  it('sends no credential at all when nobody is signed in', async () => {
+    const fetchMock = mockFetch(new Response('{}', { status: 200 }))
+
+    await apiFetch('/setup/status')
+
+    expect(headersOf(fetchMock).has('Authorization')).toBe(false)
   })
 })

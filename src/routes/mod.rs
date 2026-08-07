@@ -7,9 +7,14 @@ use serde::Serialize;
 use crate::error::ApiError;
 use crate::state::AppState;
 
+pub mod auth;
+pub mod setup;
+
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        .merge(setup::router())
+        .merge(auth::router())
         .with_state(state)
 }
 

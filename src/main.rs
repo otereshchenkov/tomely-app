@@ -1,11 +1,12 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::http::{HeaderValue, Method, header};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
-use tomely_api::{db, routes, state::AppState};
+use tomely_api::{auth::JwtKeys, db, routes, state::AppState};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,11 +19,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
-    // Fail here rather than serving a process that 500s on every request.
+    // Both of these fail here rather than at the first request that needs them:
+    // a server that cannot reach Postgres or cannot sign a token has nothing to
+    // offer, and finding that out at boot beats finding it out from a 500.
+    let jwt = Arc::new(JwtKeys::from_env()?);
+
     let db = db::connect().await?;
     tracing::info!("connected to the database");
 
-    let app = routes::router(AppState { db })
+    let app = routes::router(AppState { db, jwt })
         .layer(cors_layer()?)
         .layer(TraceLayer::new_for_http());
 

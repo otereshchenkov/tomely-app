@@ -1,15 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
-import {
-  Alert,
-  Anchor,
-  Code,
-  Container,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core'
+import { Anchor, Code, Container, Stack, Text, Title } from '@mantine/core'
 
+import { ApiUnreachable } from '../components/ApiUnreachable'
 import { apiFetch } from '../lib/api'
 
 interface Health {
@@ -47,22 +40,6 @@ function Home() {
           <Anchor href="/demo/hello">/demo/hello</Anchor>.
         </Text>
       </Stack>
-    </Container>
-  )
-}
-
-function ApiUnreachable({ error }: Readonly<{ error: Error }>) {
-  return (
-    <Container size="sm" py="xl">
-      <Alert color="red" title="Cannot reach the API">
-        <Stack gap="xs">
-          <Text size="sm">{error.message}</Text>
-          <Text size="sm" c="dimmed">
-            Start it with <Code>docker compose up -d</Code> and{' '}
-            <Code>cargo run</Code> from the repository root.
-          </Text>
-        </Stack>
-      </Alert>
     </Container>
   )
 }

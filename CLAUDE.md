@@ -13,7 +13,7 @@ in the `main` branch's history if you need to see how something used to work.
   Mantine v9, server-rendered, built by Nitro to a plain Node server.
 - **API** (`src/`) — a single Rust crate at the repository root: axum + SeaORM.
 - **Database** — Postgres, run locally via `docker-compose.yml`.
-- **Auth** — none yet. Deliberately removed rather than ported.
+- **Auth** — local accounts, JWT bearer tokens. Clerk is gone, not ported.
 
 Both halves are meant to run as containers eventually. Nothing here should
 reintroduce a dependency on a specific cloud provider.
@@ -57,7 +57,8 @@ One crate, `tomely-api`, with two binaries sharing `src/lib.rs`:
 | `src/db.rs`          | `connect()` — the pool, sized for a long-lived server                              |
 | `src/state.rs`       | `AppState { db }`, the axum `State`                                                |
 | `src/error.rs`       | `ApiError` + `IntoResponse` + `From<DbErr>`                                        |
-| `src/routes/`        | the router; `GET /health` today                                                    |
+| `src/auth/`          | password hashing, JWT issue/verify, the `CurrentUser` extractor                    |
+| `src/routes/`        | the router; `/health`, `/setup*`, `/auth/*`                                        |
 | `src/migrations/`    | schema migrations — the source of truth                                            |
 | `src/entities/`      | generated SeaORM entities — never hand-edit                                        |
 
@@ -85,6 +86,32 @@ Conventions:
 3. `sea-orm-cli generate entity -u "$DATABASE_URL" -o src/entities --with-serde both`
 
 Always migrate first, then regenerate. Entities are output, not input.
+
+### Auth
+
+A user is a row in `users`. The ways they can prove they are that user are rows in
+`user_identities`, one per method — today only `provider = 'local'`, whose
+`credentials` blob holds `{"password_hash": "$argon2id$…"}`. OIDC and passkeys are
+meant to arrive as new `provider` values, not as new columns on `users`.
+
+- **Setup.** An instance with no rows in `users` has not been claimed.
+  `GET /setup/status` says so, `POST /setup` creates the one instance admin, and
+  after that it answers 409 forever. The check-then-insert is guarded by a Postgres
+  advisory lock, so two simultaneous requests cannot both claim it.
+- **Tokens.** One HS256 JWT, no refresh pair. `JWT_SECRET` is required and has no
+  default — the server refuses to start without it. "Remember me" only picks between
+  a 12-hour and a 30-day lifetime.
+- **Client side.** The browser keeps the token in `localStorage` (remembered) or
+  `sessionStorage` (not) via `app/src/lib/token.ts`, and `apiFetch` attaches it as
+  `Authorization: Bearer`. `getToken()` returns null under SSR, which is what makes
+  server-rendered requests anonymous by construction.
+- **Guarding routes.** The root route's `beforeLoad` redirects to `/setup` while the
+  instance is unclaimed and away from it once it is not — public information, so it
+  is safe to do on the server. Private routes wrap their content in
+  `RequireAuth`, which decides on the client once the session resolves. Do not put
+  auth in a route `beforeLoad`; the token does not exist there.
+- **Claims are a convenience, not an authority.** Anything acting on a user's current
+  name, admin flag or active status reads the row — see `routes/auth.rs::me`.
 
 ### Web app (`app/`)
 
@@ -146,17 +173,21 @@ API's public origin; that is when the axum `CorsLayer` (`CORS_ORIGIN`) matters.
 Root `.env` (see `.env.example`) — read by the API and by docker compose:
 
 - `DATABASE_URL` — Postgres connection string
+- `JWT_SECRET` — token signing secret; required, no default, the server exits without it
 - `PORT` — API port, default 8080
 - `CORS_ORIGIN` — comma-separated allowed browser origins; unset means any
 - `RUST_LOG`
 - `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` / `POSTGRES_PORT` — compose overrides
 
-`app/.env` (see `app/.env.example`) — `VITE_API_URL`, `API_INTERNAL_URL`, `PORT`.
+`app/.env` (see `app/.env.example`) — `VITE_API_URL`, `API_INTERNAL_URL`, `PORT`,
+`VITE_APP_VERSION`.
 
 ## Status
 
-Working: the compose Postgres, the migration CLI, the axum server with `GET /health`,
-and a server-rendered web app that reads it.
+Working: the compose Postgres, the migration CLI, the axum server, the `users` /
+`user_identities` schema, first-run setup, password sign-in, and a server-rendered
+web app with `/setup`, `/login` and a placeholder `/dashboard`.
 
-Not built yet: the schema (`migrations()` is empty by design), every domain endpoint,
-auth, and the Dockerfiles for the two services.
+Not built yet: every domain endpoint (books, shelves, authors, series), password
+change and user management, OIDC and passkey providers, and the Dockerfiles for the
+two services.
