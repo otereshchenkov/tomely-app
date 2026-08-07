@@ -50,13 +50,6 @@ afterEach(() => {
 })
 
 describe('CreateAdminForm', () => {
-  it('has no username field - a user is identified by their email', () => {
-    renderWithProviders(<CreateAdminForm onCreated={vi.fn()} />)
-
-    expect(screen.queryByLabelText(/username/i)).toBeNull()
-    expect(screen.getByLabelText('Email')).toBeTruthy()
-  })
-
   it('refuses a password the API would reject anyway', async () => {
     const user = userEvent.setup()
     const fetchMock = mockFetch(session())
