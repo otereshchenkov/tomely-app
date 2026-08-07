@@ -5,6 +5,7 @@ import {
   Box,
   Divider,
   Group,
+  Image,
   NavLink,
   Stack,
   Text,
@@ -76,6 +77,12 @@ export function Brand() {
   return (
     <Group gap="xs" wrap="nowrap">
       <ThemeIcon variant="transparent" size="md">
+        <Image
+          src="/logo-light.png"
+          alt="logo"
+          w={26}
+          h={26}
+        />
         <IconBooks size={26} stroke={1.8} />
       </ThemeIcon>
       <Text fw={700} fz="lg" lh={1}>
