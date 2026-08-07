@@ -122,9 +122,12 @@ reading somebody's shelves. A non-member asking for a library by id gets a 404
 rather than a 403, so ids cannot be probed for.
 
 - **Roles are rows, not an enum.** `roles` ships with `owner`, `editor` and
-  `viewer` marked `is_system`, seeded by m0003 with fixed UUIDs so every instance
-  agrees on them. The API looks them up by name, so nothing in the code is coupled
-  to those ids. Users defining their own roles is the reason this is a table.
+  `viewer` marked `is_system`, seeded by m0003. Their ids are minted when the
+  migration runs, so no two installations share one and nothing can come to
+  depend on a particular id — always resolve a system role by name, as
+  `OWNER_ROLE` in `routes/libraries.rs` does. Renaming one of the three breaks
+  that lookup; adding a role does not. Users defining their own roles is the
+  reason this is a table at all.
 - **The primary owner is recorded twice.** `libraries.owner_id` is the thing that
   cannot be revoked; the same person also gets an ordinary membership with the
   `owner` role and a null `invited_by` — nobody invited them. Permission checks

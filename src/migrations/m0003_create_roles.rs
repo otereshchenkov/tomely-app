@@ -1,7 +1,29 @@
 use super::*;
 
+use uuid::Uuid;
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
+
+/// The roles every instance starts with.
+///
+/// Referenced by name from the API - see `OWNER_ROLE` in `routes/libraries.rs` -
+/// which is what lets their ids be generated per installation rather than fixed
+/// here. Renaming one of these breaks that lookup; adding a role does not.
+const SYSTEM_ROLES: [(&str, &str); 3] = [
+    (
+        "owner",
+        "Full control of the library, including sharing it and deleting it.",
+    ),
+    (
+        "editor",
+        "Can add, edit and remove books, shelves and series.",
+    ),
+    (
+        "viewer",
+        "Can browse the library but cannot change anything in it.",
+    ),
+];
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -29,28 +51,37 @@ impl MigrationTrait for Migration {
                 );
 
                 CREATE UNIQUE INDEX roles_name_key ON roles (lower(name));
-
-                INSERT INTO roles (id, name, description, is_system) VALUES
-                    (
-                        '019fdd98-9008-7c9a-9c93-8a3643b2dec2',
-                        'owner',
-                        'Full control of the library, including sharing it and deleting it.',
-                        TRUE
-                    ),
-                    (
-                        '019fdd98-9008-7fa1-bb03-f871ae30df7f',
-                        'editor',
-                        'Can add, edit and remove books, shelves and series.',
-                        TRUE
-                    ),
-                    (
-                        '019fdd98-9008-71e4-a996-5a0c364f7cf0',
-                        'viewer',
-                        'Can browse the library but cannot change anything in it.',
-                        TRUE
-                    );
                 "#,
             )
+            .await?;
+
+        // A separate statement, because the ids are minted here rather than
+        // written down: two installations should not share role ids, so that
+        // nothing anywhere can come to depend on a particular one.
+        //
+        // Generated with `Uuid::now_v7()` rather than in SQL because Postgres
+        // only grew `uuidv7()` in 18, and `gen_random_uuid()` would put v4s in a
+        // schema where every other id is a v7.
+        let values = SYSTEM_ROLES
+            .iter()
+            .map(|(name, description)| {
+                format!(
+                    "('{}', '{name}', '{}', TRUE)",
+                    Uuid::now_v7(),
+                    // These carry no apostrophes today. Doubling them anyway, so
+                    // that adding a role with one does not quietly produce
+                    // invalid SQL.
+                    description.replace('\'', "''"),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        manager
+            .get_connection()
+            .execute_unprepared(&format!(
+                "INSERT INTO roles (id, name, description, is_system) VALUES {values};"
+            ))
             .await?;
 
         Ok(())
