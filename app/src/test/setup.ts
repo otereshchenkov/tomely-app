@@ -33,6 +33,19 @@ Object.defineProperty(globalThis, 'ResizeObserver', {
   },
 })
 
+// An autosizing Textarea re-measures itself once webfonts have loaded, because
+// the text it is measuring changes size when they do. jsdom implements no font
+// loading API at all, and Mantine reads `document.fonts` without a guard.
+Object.defineProperty(document, 'fonts', {
+  writable: true,
+  value: {
+    ready: Promise.resolve(),
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  },
+})
+
 afterEach(() => {
   cleanup()
 })

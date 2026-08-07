@@ -1,4 +1,13 @@
-import { AppShell, Box, Burger, Drawer, Group, Title } from '@mantine/core'
+import {
+  AppShell,
+  Box,
+  Burger,
+  Drawer,
+  Group,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 
 import { AppFooter } from './AppFooter'
@@ -23,10 +32,18 @@ import type { ReactNode } from 'react'
  */
 export function AppLayout({
   title,
+  breadcrumbs,
+  subtitle,
   actions,
   children,
 }: Readonly<{
   title: ReactNode
+  /** A trail above the heading, for a page that sits inside something else.
+   *  Above rather than below, because it is the way back out. */
+  breadcrumbs?: ReactNode
+  /** A line under the heading - a count, a section name. Outside the `<h1>` on
+   *  purpose: it is context, not part of the page's name. */
+  subtitle?: ReactNode
   /** Buttons for the title bar - kept on the right, next to the heading. */
   actions?: ReactNode
   children: ReactNode
@@ -82,9 +99,17 @@ export function AppLayout({
             wrap="nowrap"
             gap="sm"
           >
-            <Title order={1} fz="h4" lh={1.3}>
-              {title}
-            </Title>
+            <Stack gap={2} miw={0}>
+              {breadcrumbs}
+              <Title order={1} fz="h4" lh={1.3} lineClamp={1}>
+                {title}
+              </Title>
+              {subtitle ? (
+                <Text fz="xs" c="dimmed" lh={1.3}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </Stack>
             {actions}
           </Group>
         </Box>

@@ -40,9 +40,6 @@ export interface DashboardStats {
 }
 
 export interface DashboardSummary {
-  /** Zero means the instance has no libraries yet, which is what puts the
-   *  "create your first library" prompt on the page. */
-  libraryCount: number
   stats: DashboardStats
   finishedThisYear: number
   /** Twelve buckets, oldest first, ending with the current month. */
@@ -81,7 +78,6 @@ export function monthLabel(month: string, locale?: string): string {
 
 export function emptyDashboard(now: Date): DashboardSummary {
   return {
-    libraryCount: 0,
     stats: { reading: 0, favourites: 0, totalBooks: 0, unread: 0 },
     finishedThisYear: 0,
     finishedByMonth: lastTwelveMonths(now),

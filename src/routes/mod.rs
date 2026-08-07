@@ -8,6 +8,7 @@ use crate::error::ApiError;
 use crate::state::AppState;
 
 pub mod auth;
+pub mod libraries;
 pub mod setup;
 
 pub fn router(state: AppState) -> Router {
@@ -15,6 +16,7 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health))
         .merge(setup::router())
         .merge(auth::router())
+        .merge(libraries::router())
         .with_state(state)
 }
 

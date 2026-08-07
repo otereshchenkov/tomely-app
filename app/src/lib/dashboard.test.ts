@@ -39,6 +39,6 @@ describe('emptyDashboard', () => {
     expect(dashboard.finishedByMonth).toHaveLength(12)
     expect(dashboard.finishedThisYear).toBe(0)
     expect(dashboard.currentlyReading).toEqual([])
-    expect(dashboard.libraryCount).toBe(0)
+    expect(dashboard.stats.totalBooks).toBe(0)
   })
 })

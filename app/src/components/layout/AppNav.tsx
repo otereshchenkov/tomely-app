@@ -1,4 +1,9 @@
-import { Link, useRouterState } from '@tanstack/react-router'
+import {
+  Link,
+  linkOptions,
+  useParams,
+  useRouterState,
+} from '@tanstack/react-router'
 import {
   Anchor,
   Badge,
@@ -13,6 +18,7 @@ import {
   useMantineColorScheme,
 } from '@mantine/core'
 import {
+  IconArrowsShuffle,
   IconBooks,
   IconDeviceDesktop,
   IconFileImport,
@@ -20,12 +26,17 @@ import {
   IconLibrary,
   IconMoon,
   IconSettings,
+  IconStack2,
   IconSun,
+  IconUserCircle,
   IconUsers,
+  IconUsersGroup,
 } from '@tabler/icons-react'
 
 import { Mark } from '#/components/Mark'
 import { useAuth } from '#/lib/auth'
+
+import classes from './AppNav.module.css'
 
 import type { MantineColorScheme } from '@mantine/core'
 import type { TablerIcon } from '@tabler/icons-react'
@@ -35,11 +46,24 @@ interface NavItem {
   label: string
   icon: TablerIcon
   /**
-   * Where the item goes, when it goes anywhere. Only the dashboard exists so
-   * far; the rest are here because the shape of the navigation is part of the
-   * design, and they say "Soon" rather than pretending.
+   * Where the item goes, when it goes anywhere. Built with `linkOptions` so the
+   * destination is checked against the route tree; items without one are not
+   * built yet and say "Soon" rather than pretending.
    */
-  to?: LinkProps['to']
+  link?: LinkProps
+  /**
+   * The pathname this item is "at", for deciding whether it is the current one.
+   * Written out rather than derived, because a `to` like
+   * `/libraries/$libraryId/books` is a template and never equals a real pathname.
+   *
+   * Matched exactly. "Libraries" stays unhighlighted while you are inside one,
+   * because the child row you are actually on is the one lit up, and two
+   * highlights would leave neither meaning anything.
+   */
+  activePath: string | null
+  /** Rendered indented beneath the item, for a section of the app you are
+   *  currently inside. */
+  children?: NavItem[]
 }
 
 interface NavSection {
@@ -49,27 +73,70 @@ interface NavSection {
   adminOnly?: boolean
 }
 
-const sections: NavSection[] = [
-  {
-    items: [
-      { label: 'Dashboard', icon: IconLayoutDashboard, to: '/dashboard' },
-      { label: 'Books', icon: IconBooks },
-      { label: 'Shelves', icon: IconLibrary },
-    ],
-  },
-  {
-    label: 'Tools',
-    items: [{ label: 'Import', icon: IconFileImport }],
-  },
-  {
-    label: 'Admin',
-    adminOnly: true,
-    items: [
-      { label: 'Users', icon: IconUsers },
-      { label: 'Settings', icon: IconSettings },
-    ],
-  },
-]
+/**
+ * What the navigation shows, given where you are.
+ *
+ * A function rather than a constant because the library you have open changes
+ * it: the things that belong to one library - its books, its shelves, who it is
+ * shared with - only make sense once there is a library to scope them to, and
+ * they hang underneath it. Contributors and series stay at the top level; they
+ * are catalogue metadata shared across every library, not part of any one.
+ */
+function sectionsFor(libraryId: string | undefined): NavSection[] {
+  return [
+    {
+      items: [
+        {
+          label: 'Dashboard',
+          icon: IconLayoutDashboard,
+          link: linkOptions({ to: '/dashboard' }),
+          activePath: '/dashboard',
+        },
+        {
+          label: 'Libraries',
+          icon: IconLibrary,
+          link: linkOptions({ to: '/libraries' }),
+          activePath: '/libraries',
+          children: libraryId
+            ? [
+                {
+                  label: 'Books',
+                  icon: IconBooks,
+                  link: linkOptions({
+                    to: '/libraries/$libraryId/books',
+                    params: { libraryId },
+                  }),
+                  activePath: `/libraries/${libraryId}/books`,
+                },
+                { label: 'Shelves', icon: IconStack2, activePath: null },
+                { label: 'Loans', icon: IconArrowsShuffle, activePath: null },
+                { label: 'Members', icon: IconUsersGroup, activePath: null },
+              ]
+            : undefined,
+        },
+        { label: 'Contributors', icon: IconUserCircle, activePath: null },
+        { label: 'Series', icon: IconBooks, activePath: null },
+      ],
+    },
+    {
+      label: 'Tools',
+      items: [{ label: 'Import', icon: IconFileImport, activePath: null }],
+    },
+    {
+      label: 'Admin',
+      adminOnly: true,
+      items: [
+        { label: 'Users', icon: IconUsers, activePath: null },
+        { label: 'Settings', icon: IconSettings, activePath: null },
+      ],
+    },
+  ]
+}
+
+/** Whether `item` is the page currently being looked at. */
+function isActive(item: NavItem, pathname: string): boolean {
+  return item.activePath !== null && pathname === item.activePath
+}
 
 /** The wordmark, shared by the navbar, the mobile header and the drawer. */
 export function Brand() {
@@ -84,6 +151,86 @@ export function Brand() {
 }
 
 /**
+ * One row of the navigation, and whatever hangs under it.
+ *
+ * An item with no `link` is not built yet and says so rather than 404ing.
+ *
+ * Children are rendered as siblings in an indented group, *not* through
+ * Mantine's own `NavLink` nesting. A `NavLink` with children calls
+ * `event.preventDefault()` on every click so it can toggle its collapse
+ * instead - which would make "Libraries" un-clickable exactly when you are
+ * inside a library. There is nothing to toggle here anyway: the children are
+ * showing because of where you are, not because anyone opened them.
+ */
+function NavItemLink({
+  item,
+  pathname,
+  onNavigate,
+  nested = false,
+}: Readonly<{
+  item: NavItem
+  pathname: string
+  onNavigate?: () => void
+  /** A child row. Highlighted with colour alone, so a filled parent and the
+   *  current child do not merge into one block. */
+  nested?: boolean
+}>) {
+  const link = item.link
+
+  return (
+    <>
+      {link ? (
+        <NavLink
+          // `renderRoot` rather than `component={Link}`: Mantine's polymorphic
+          // prop erases Link's own generics, and with them the check that
+          // `params` matches the route's `$placeholders`.
+          //
+          // `exact` because Mantine styles `aria-current="page"` exactly as it
+          // styles `data-active`, and Link sets it on prefix matches by
+          // default - which lit "Libraries" up from inside a library, on top of
+          // the child row that was genuinely current.
+          renderRoot={(props) => (
+            <Link {...link} activeOptions={{ exact: true }} {...props} />
+          )}
+          label={item.label}
+          variant={nested ? 'subtle' : 'light'}
+          leftSection={<item.icon size={18} stroke={1.6} />}
+          active={isActive(item, pathname)}
+          onClick={onNavigate}
+        />
+      ) : (
+        <NavLink
+          component="button"
+          type="button"
+          label={item.label}
+          leftSection={<item.icon size={18} stroke={1.6} />}
+          rightSection={
+            <Badge size="xs" variant="default" fw={500}>
+              Soon
+            </Badge>
+          }
+          disabled
+        />
+      )}
+
+      {item.children?.length ? (
+        <Box className={classes.children}>
+          {item.children.map((child) => (
+            <NavItemLink
+              key={child.label}
+              item={child}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              nested
+            />
+          ))}
+        </Box>
+      ) : null}
+    </>
+  )
+}
+
+/**
  * The navigation itself: the same markup in the desktop navbar and in the
  * mobile drawer, so there is one place to add a destination.
  *
@@ -93,11 +240,14 @@ export function Brand() {
 export function AppNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>) {
   const { user } = useAuth()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  // `strict: false` because this renders on every page, most of which have no
+  // params at all.
+  const { libraryId } = useParams({ strict: false })
 
   return (
     <>
       <Box flex={1} style={{ overflowY: 'auto' }} py="xs">
-        {sections
+        {sectionsFor(libraryId)
           .filter((section) => !section.adminOnly || user?.isInstanceAdmin)
           .map((section) => (
             <Box key={section.label ?? 'main'} mb="xs">
@@ -115,34 +265,14 @@ export function AppNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>) {
                 </Text>
               ) : null}
 
-              {section.items.map((item) =>
-                item.to ? (
-                  <NavLink
-                    key={item.label}
-                    component={Link}
-                    to={item.to}
-                    label={item.label}
-                    leftSection={<item.icon size={18} stroke={1.6} />}
-                    active={pathname === item.to}
-                    variant="light"
-                    onClick={onNavigate}
-                  />
-                ) : (
-                  <NavLink
-                    key={item.label}
-                    component="button"
-                    type="button"
-                    label={item.label}
-                    leftSection={<item.icon size={18} stroke={1.6} />}
-                    rightSection={
-                      <Badge size="xs" variant="default" fw={500}>
-                        Soon
-                      </Badge>
-                    }
-                    disabled
-                  />
-                ),
-              )}
+              {section.items.map((item) => (
+                <NavItemLink
+                  key={item.label}
+                  item={item}
+                  pathname={pathname}
+                  onNavigate={onNavigate}
+                />
+              ))}
             </Box>
           ))}
       </Box>

@@ -2,5 +2,8 @@
 
 pub mod prelude;
 
+pub mod libraries;
+pub mod library_memberships;
+pub mod roles;
 pub mod user_identities;
 pub mod users;
