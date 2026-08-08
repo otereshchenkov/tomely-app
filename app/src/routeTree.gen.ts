@@ -15,8 +15,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DemoIdRouteImport } from './routes/demo.$id'
 import { Route as LibrariesIndexRouteImport } from './routes/libraries.index'
-import { Route as LibrariesLibraryIdBooksRouteImport } from './routes/libraries.$libraryId.books'
 import { Route as LibrariesLibraryIdSettingsRouteImport } from './routes/libraries.$libraryId.settings'
+import { Route as LibrariesLibraryIdBooksIndexRouteImport } from './routes/libraries.$libraryId.books.index'
+import { Route as LibrariesLibraryIdBooksAddRouteImport } from './routes/libraries.$libraryId.books.add'
+import { Route as LibrariesLibraryIdBooksNewRouteImport } from './routes/libraries.$libraryId.books.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -48,15 +50,28 @@ const LibrariesIndexRoute = LibrariesIndexRouteImport.update({
   path: '/libraries/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LibrariesLibraryIdBooksRoute = LibrariesLibraryIdBooksRouteImport.update({
-  id: '/libraries/$libraryId/books',
-  path: '/libraries/$libraryId/books',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LibrariesLibraryIdSettingsRoute =
   LibrariesLibraryIdSettingsRouteImport.update({
     id: '/libraries/$libraryId/settings',
     path: '/libraries/$libraryId/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LibrariesLibraryIdBooksIndexRoute =
+  LibrariesLibraryIdBooksIndexRouteImport.update({
+    id: '/libraries/$libraryId/books/',
+    path: '/libraries/$libraryId/books/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LibrariesLibraryIdBooksAddRoute =
+  LibrariesLibraryIdBooksAddRouteImport.update({
+    id: '/libraries/$libraryId/books/add',
+    path: '/libraries/$libraryId/books/add',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LibrariesLibraryIdBooksNewRoute =
+  LibrariesLibraryIdBooksNewRouteImport.update({
+    id: '/libraries/$libraryId/books/new',
+    path: '/libraries/$libraryId/books/new',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -67,8 +82,10 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/demo/$id': typeof DemoIdRoute
   '/libraries/': typeof LibrariesIndexRoute
-  '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksRoute
   '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
+  '/libraries/$libraryId/books/add': typeof LibrariesLibraryIdBooksAddRoute
+  '/libraries/$libraryId/books/new': typeof LibrariesLibraryIdBooksNewRoute
+  '/libraries/$libraryId/books/': typeof LibrariesLibraryIdBooksIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -77,8 +94,10 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/demo/$id': typeof DemoIdRoute
   '/libraries': typeof LibrariesIndexRoute
-  '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksRoute
   '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
+  '/libraries/$libraryId/books/add': typeof LibrariesLibraryIdBooksAddRoute
+  '/libraries/$libraryId/books/new': typeof LibrariesLibraryIdBooksNewRoute
+  '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -88,8 +107,10 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/demo/$id': typeof DemoIdRoute
   '/libraries/': typeof LibrariesIndexRoute
-  '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksRoute
   '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
+  '/libraries/$libraryId/books/add': typeof LibrariesLibraryIdBooksAddRoute
+  '/libraries/$libraryId/books/new': typeof LibrariesLibraryIdBooksNewRoute
+  '/libraries/$libraryId/books/': typeof LibrariesLibraryIdBooksIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -100,8 +121,10 @@ export interface FileRouteTypes {
     | '/setup'
     | '/demo/$id'
     | '/libraries/'
-    | '/libraries/$libraryId/books'
     | '/libraries/$libraryId/settings'
+    | '/libraries/$libraryId/books/add'
+    | '/libraries/$libraryId/books/new'
+    | '/libraries/$libraryId/books/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -110,8 +133,10 @@ export interface FileRouteTypes {
     | '/setup'
     | '/demo/$id'
     | '/libraries'
-    | '/libraries/$libraryId/books'
     | '/libraries/$libraryId/settings'
+    | '/libraries/$libraryId/books/add'
+    | '/libraries/$libraryId/books/new'
+    | '/libraries/$libraryId/books'
   id:
     | '__root__'
     | '/'
@@ -120,8 +145,10 @@ export interface FileRouteTypes {
     | '/setup'
     | '/demo/$id'
     | '/libraries/'
-    | '/libraries/$libraryId/books'
     | '/libraries/$libraryId/settings'
+    | '/libraries/$libraryId/books/add'
+    | '/libraries/$libraryId/books/new'
+    | '/libraries/$libraryId/books/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -131,8 +158,10 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   DemoIdRoute: typeof DemoIdRoute
   LibrariesIndexRoute: typeof LibrariesIndexRoute
-  LibrariesLibraryIdBooksRoute: typeof LibrariesLibraryIdBooksRoute
   LibrariesLibraryIdSettingsRoute: typeof LibrariesLibraryIdSettingsRoute
+  LibrariesLibraryIdBooksAddRoute: typeof LibrariesLibraryIdBooksAddRoute
+  LibrariesLibraryIdBooksNewRoute: typeof LibrariesLibraryIdBooksNewRoute
+  LibrariesLibraryIdBooksIndexRoute: typeof LibrariesLibraryIdBooksIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -179,18 +208,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibrariesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/libraries/$libraryId/books': {
-      id: '/libraries/$libraryId/books'
-      path: '/libraries/$libraryId/books'
-      fullPath: '/libraries/$libraryId/books'
-      preLoaderRoute: typeof LibrariesLibraryIdBooksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/libraries/$libraryId/settings': {
       id: '/libraries/$libraryId/settings'
       path: '/libraries/$libraryId/settings'
       fullPath: '/libraries/$libraryId/settings'
       preLoaderRoute: typeof LibrariesLibraryIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/libraries/$libraryId/books/': {
+      id: '/libraries/$libraryId/books/'
+      path: '/libraries/$libraryId/books'
+      fullPath: '/libraries/$libraryId/books/'
+      preLoaderRoute: typeof LibrariesLibraryIdBooksIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/libraries/$libraryId/books/add': {
+      id: '/libraries/$libraryId/books/add'
+      path: '/libraries/$libraryId/books/add'
+      fullPath: '/libraries/$libraryId/books/add'
+      preLoaderRoute: typeof LibrariesLibraryIdBooksAddRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/libraries/$libraryId/books/new': {
+      id: '/libraries/$libraryId/books/new'
+      path: '/libraries/$libraryId/books/new'
+      fullPath: '/libraries/$libraryId/books/new'
+      preLoaderRoute: typeof LibrariesLibraryIdBooksNewRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -203,8 +246,10 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   DemoIdRoute: DemoIdRoute,
   LibrariesIndexRoute: LibrariesIndexRoute,
-  LibrariesLibraryIdBooksRoute: LibrariesLibraryIdBooksRoute,
   LibrariesLibraryIdSettingsRoute: LibrariesLibraryIdSettingsRoute,
+  LibrariesLibraryIdBooksAddRoute: LibrariesLibraryIdBooksAddRoute,
+  LibrariesLibraryIdBooksNewRoute: LibrariesLibraryIdBooksNewRoute,
+  LibrariesLibraryIdBooksIndexRoute: LibrariesLibraryIdBooksIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

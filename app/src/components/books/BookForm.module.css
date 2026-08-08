@@ -1,0 +1,24 @@
+/*
+ * Mantine's checked `Radio.Card` only changes its border, which is quiet next
+ * to three unchecked siblings of the same size. A tint behind the chosen one is
+ * what makes the row readable at a glance rather than by comparing edges.
+ */
+.format[data-checked] {
+  background-color: light-dark(
+    var(--mantine-color-indigo-0),
+    var(--mantine-color-dark-6)
+  );
+}
+
+.format[data-checked] .formatLabel {
+  color: var(--mantine-primary-color-filled);
+}
+
+/*
+ * The edition panel is a nested group of fields rather than a section of the
+ * page, so it sits on a surface of its own to say so.
+ */
+.edition {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}

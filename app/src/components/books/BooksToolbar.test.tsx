@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '#/test/render'
 
@@ -14,7 +15,7 @@ const input = (label: string) => screen.getByLabelText<HTMLInputElement>(label)
 
 describe('BooksToolbar', () => {
   it('draws every control the page will have', () => {
-    renderWithProviders(<BooksToolbar />)
+    renderWithProviders(<BooksToolbar onAddBook={vi.fn()} />)
 
     expect(input('Search books')).toBeTruthy()
     expect(button('Search')).toBeTruthy()
@@ -25,8 +26,8 @@ describe('BooksToolbar', () => {
     expect(button('Add book')).toBeTruthy()
   })
 
-  it('leaves them all disabled, because none of them work yet', () => {
-    renderWithProviders(<BooksToolbar />)
+  it('leaves everything but adding a book disabled, because nothing else works yet', () => {
+    renderWithProviders(<BooksToolbar onAddBook={vi.fn()} />)
 
     expect(input('Search books').disabled).toBe(true)
     expect(input('List view').disabled).toBe(true)
@@ -34,6 +35,16 @@ describe('BooksToolbar', () => {
     expect(button('Search').disabled).toBe(true)
     expect(button('Choose columns').disabled).toBe(true)
     expect(button('Import CSV').disabled).toBe(true)
-    expect(button('Add book').disabled).toBe(true)
+    expect(button('Add book').disabled).toBe(false)
+  })
+
+  it('hands adding a book back to the page, which owns the router', async () => {
+    const user = userEvent.setup()
+    const onAddBook = vi.fn()
+
+    renderWithProviders(<BooksToolbar onAddBook={onAddBook} />)
+    await user.click(button('Add book'))
+
+    expect(onAddBook).toHaveBeenCalledTimes(1)
   })
 })
