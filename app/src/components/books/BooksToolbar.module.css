@@ -1,0 +1,19 @@
+/*
+ * A disabled control never fires the mouse events a tooltip listens for, and
+ * the events do not bubble to a wrapper either. Taking the child out of hit
+ * testing altogether lets the hover land on the wrapper instead, which is the
+ * element `Tooltip` is actually attached to.
+ */
+.soon > * {
+  pointer-events: none;
+}
+
+/*
+ * Mantine's disabled fill sits almost exactly on the surface behind it in dark
+ * mode, which leaves the empty state's call to action reading as loose text
+ * rather than as a button. An outline keeps it recognisably a control - it is
+ * meant to look unavailable, not absent.
+ */
+.soon > button:disabled {
+  border: 1px solid var(--mantine-color-default-border);
+}
