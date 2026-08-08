@@ -2,6 +2,5 @@
 
 pub use super::libraries::Entity as Libraries;
 pub use super::library_memberships::Entity as LibraryMemberships;
-pub use super::roles::Entity as Roles;
 pub use super::user_identities::Entity as UserIdentities;
 pub use super::users::Entity as Users;

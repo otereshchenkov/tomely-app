@@ -20,7 +20,7 @@ function created(name = 'My books', description: string | null = null) {
       description,
       ownerId: '0198c0f6-0000-7000-8000-000000000001',
       isPrimaryOwner: true,
-      role: 'owner',
+      role: 'library_owner',
       createdAt: '2026-08-07T00:00:00Z',
       updatedAt: '2026-08-07T00:00:00Z',
     }),

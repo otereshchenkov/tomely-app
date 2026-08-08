@@ -7,9 +7,9 @@
 //!
 //! The person who creates a library is its *primary owner*: recorded on
 //! `libraries.owner_id`, which is the one thing that cannot be revoked, and
-//! given an ordinary membership with the `owner` role like anyone else they
-//! later share it with. Permission checks read the membership, so a primary
-//! owner and an owner are the same thing to every caller but this one.
+//! given an ordinary membership with `library_owner` like anyone else they later
+//! share it with. Permission checks read the membership, so a primary owner and
+//! an owner are the same thing to every caller but this one.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -18,28 +18,34 @@ use axum::{Json, Router};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, Func};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, JoinType, NotSet,
-    QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
+    ActiveEnum, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult,
+    JoinType, NotSet, QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth::CurrentUser;
-use crate::entities::{libraries, library_memberships, roles};
+use crate::entities::sea_orm_active_enums::LibraryRole;
+use crate::entities::{libraries, library_memberships};
 use crate::error::ApiError;
 use crate::state::AppState;
-
-/// The system role a library's creator is given.
-///
-/// Looked up by name rather than by the id m0003 seeds, so the roles table stays
-/// the source of truth and nothing here has to be migrated when it changes.
-pub const OWNER_ROLE: &str = "owner";
 
 /// Long enough for "Books I lent Dad and would like back", short enough that the
 /// column is not a place to paste an essay - that is what the description is for.
 const MAX_NAME_LENGTH: usize = 120;
 
 const MAX_DESCRIPTION_LENGTH: usize = 2_000;
+
+/// A role as the wire spells it, which is how the database spells it.
+///
+/// `LibraryRole` is generated with a plain `Serialize`, which would write the Rust
+/// variant name - `LibraryOwner` - rather than the `library_owner` that m0004's
+/// `library_role` type holds and that the client matches on. `to_value()` carries
+/// the `string_value` behind each variant, so it is the one spelling of the three
+/// there ever needs to be.
+fn wire_name(role: &LibraryRole) -> String {
+    role.to_value().value.into_owned()
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -52,6 +58,10 @@ pub fn router() -> Router<AppState> {
 /// `role` and `isPrimaryOwner` are properties of the *caller*, not of the row,
 /// which is what lets the client draw the crown and decide what to offer without
 /// a second request.
+///
+/// `role` is a `String` rather than a `LibraryRole` for the reason `wire_name`
+/// gives: serializing the generated enum would put its Rust variant name on the
+/// wire instead of the value the database and the client both say.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryResponse {
@@ -68,14 +78,14 @@ pub struct LibraryResponse {
 /// One row of the libraries-joined-to-membership query.
 ///
 /// A hand-rolled projection rather than `find_also_related`, because the only
-/// thing wanted from the other two tables is the role's name.
+/// thing wanted from the membership is the caller's role.
 #[derive(Debug, FromQueryResult)]
 struct LibraryRow {
     id: Uuid,
     name: String,
     description: Option<String>,
     owner_id: Uuid,
-    role: String,
+    role: LibraryRole,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -88,7 +98,7 @@ impl LibraryRow {
             name: self.name,
             description: self.description,
             owner_id: self.owner_id,
-            role: self.role,
+            role: wire_name(&self.role),
             created_at: self.created_at,
             updated_at: self.updated_at,
         }
@@ -109,10 +119,6 @@ async fn visible_to<C: ConnectionTrait>(
             JoinType::InnerJoin,
             libraries::Relation::LibraryMemberships.def(),
         )
-        .join(
-            JoinType::InnerJoin,
-            library_memberships::Relation::Roles.def(),
-        )
         .filter(library_memberships::Column::UserId.eq(caller));
 
     if let Some(id) = only {
@@ -129,11 +135,10 @@ async fn visible_to<C: ConnectionTrait>(
             libraries::Column::CreatedAt,
             libraries::Column::UpdatedAt,
         ])
-        .column_as(roles::Column::Name, "role")
-        // Table-qualified: `roles` has a `name` too, and an unqualified one here
-        // is an ambiguous column reference that Postgres refuses outright.
-        // Ordered case-insensitively so "attic" and "Attic" sort where a reader
-        // expects, rather than by codepoint.
+        .column_as(library_memberships::Column::Role, "role")
+        // Table-qualified so the ordering says which `name` it means, whatever
+        // else the join grows a column of that name. Case-insensitive, so "attic"
+        // and "Attic" sort where a reader expects rather than by codepoint.
         .order_by_asc(Expr::expr(Func::lower(Expr::col((
             libraries::Entity,
             libraries::Column::Name,
@@ -185,8 +190,8 @@ async fn visible_one<C: ConnectionTrait>(
 /// inconsistency: this is only ever reached through `visible_one`, so the
 /// caller has already been shown the library exists. Naming the rule tells them
 /// nothing they could not see, and it is the only answer they can act on.
-fn require_owner(role: &str) -> Result<(), ApiError> {
-    if role == OWNER_ROLE {
+fn require_owner(role: &LibraryRole) -> Result<(), ApiError> {
+    if *role == LibraryRole::LibraryOwner {
         return Ok(());
     }
 
@@ -272,18 +277,6 @@ async fn create(
 
     let txn = state.db.begin().await?;
 
-    // Seeded by m0003. Missing means the migrations did not all run, which is an
-    // instance problem rather than something the caller did wrong.
-    let owner_role = roles::Entity::find()
-        .filter(roles::Column::Name.eq(OWNER_ROLE))
-        .one(&txn)
-        .await?
-        .ok_or_else(|| {
-            ApiError::Internal(format!(
-                "The '{OWNER_ROLE}' role is missing from the database"
-            ))
-        })?;
-
     let library = libraries::ActiveModel {
         id: Set(Uuid::now_v7()),
         name: Set(fields.name),
@@ -299,7 +292,7 @@ async fn create(
         id: Set(Uuid::now_v7()),
         library_id: Set(library.id),
         user_id: Set(claims.sub),
-        role_id: Set(owner_role.id),
+        role: Set(LibraryRole::LibraryOwner),
         // Nobody invited them - that is what makes this the primary owner.
         invited_by: Set(None),
         joined_at: NotSet,
@@ -317,7 +310,7 @@ async fn create(
             description: library.description,
             owner_id: library.owner_id,
             is_primary_owner: true,
-            role: owner_role.name,
+            role: wire_name(&LibraryRole::LibraryOwner),
             created_at: library.created_at.into(),
             updated_at: library.updated_at.into(),
         }),
@@ -354,7 +347,7 @@ async fn update(
         id: Set(id),
         name: Set(fields.name),
         description: Set(fields.description),
-        // m0004 gives the column a default and there is no trigger behind it, so
+        // m0003 gives the column a default and there is no trigger behind it, so
         // a row never told it changed goes on claiming it was last touched when
         // it was created.
         updated_at: Set(Utc::now().into()),
@@ -384,7 +377,7 @@ async fn update(
 /// Delete a library and everything hanging off it.
 ///
 /// No transaction: `library_memberships.library_id` is `ON DELETE CASCADE`
-/// (m0005), so the memberships go in the same statement. Books and shelves
+/// (m0004), so the memberships go in the same statement. Books and shelves
 /// should carry the same cascade when they arrive, rather than this growing a
 /// hand-rolled teardown.
 ///
@@ -445,7 +438,7 @@ mod tests {
 
     #[test]
     fn an_owner_may_change_a_library() {
-        assert_ok!(require_owner(OWNER_ROLE));
+        assert_ok!(require_owner(&LibraryRole::LibraryOwner));
     }
 
     #[test]
@@ -453,22 +446,23 @@ mod tests {
         // Refused rather than hidden: they can already see the library, so
         // pretending it is not there would tell them nothing and help nobody.
         assert!(matches!(
-            require_owner("editor"),
+            require_owner(&LibraryRole::LibraryEditor),
             Err(ApiError::Forbidden(_))
         ));
         assert!(matches!(
-            require_owner("viewer"),
+            require_owner(&LibraryRole::LibraryViewer),
             Err(ApiError::Forbidden(_))
         ));
     }
 
     #[test]
-    fn a_role_nobody_defined_is_not_an_owner() {
-        // Roles are rows, so an instance can define as many as it likes.
-        // Anything that is not literally the owner role is refused rather than
-        // guessed at - including one that only differs by case, since m0003's
-        // unique index is on `lower(name)` and this comparison is not.
-        assert_err!(require_owner("librarian"));
-        assert_err!(require_owner("Owner"));
+    fn the_roles_are_spelled_the_same_everywhere() {
+        // These strings are the values of the `library_role` type in m0004 and
+        // the union `app/src/lib/libraries.ts` matches on, so the variant names
+        // are not the only thing that has to agree. Renaming one of them is a
+        // migration and a change to the client, not a rename.
+        assert_eq!(wire_name(&LibraryRole::LibraryOwner), "library_owner");
+        assert_eq!(wire_name(&LibraryRole::LibraryEditor), "library_editor");
+        assert_eq!(wire_name(&LibraryRole::LibraryViewer), "library_viewer");
     }
 }

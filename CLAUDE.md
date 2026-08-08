@@ -121,22 +121,29 @@ sees everything" shortcut, because administering an instance is not the same as
 reading somebody's shelves. A non-member asking for a library by id gets a 404
 rather than a 403, so ids cannot be probed for.
 
-- **Roles are rows, not an enum.** `roles` ships with `owner`, `editor` and
-  `viewer` marked `is_system`, seeded by m0003. Their ids are minted when the
-  migration runs, so no two installations share one and nothing can come to
-  depend on a particular id — always resolve a system role by name, as
-  `OWNER_ROLE` in `routes/libraries.rs` does. Renaming one of the three breaks
-  that lookup; adding a role does not. Users defining their own roles is the
-  reason this is a table at all.
-- **Roles now gate something.** Only an `owner` membership may rename or delete a
-  library. A member who is not one gets a 403, not the 404 a stranger gets: by
+- **Roles are an enum, not rows.** There are exactly three —
+  `library_owner`, `library_editor`, `library_viewer` — and they are values of the
+  `library_role` Postgres type created by m0004, held in
+  `library_memberships.role`. On the Rust side they are `LibraryRole` in
+  `src/entities/sea_orm_active_enums.rs`, which is _generated_ like every other
+  entity; on the client they are the `LibraryRole` union in `app/src/lib/libraries.ts`.
+  The same spelling in all three places, and on the wire — `wire_name` in
+  `routes/libraries.rs` is what puts `library_owner` rather than the Rust variant
+  name into the JSON, because the generated enum's `Serialize` writes variant names.
+  The prefix is there because these say what somebody may do _in a library_; an
+  instance-level role would be a different question about a different scope.
+  Adding a role means a migration (`ALTER TYPE library_role ADD VALUE`), which is
+  the price of the database refusing everything else outright. There is no
+  user-defined role and nothing reads a role out of a table.
+- **Roles gate something.** Only a `library_owner` membership may rename or delete
+  a library. A member who is not one gets a 403, not the 404 a stranger gets: by
   then they have already been shown the library exists, so naming the rule tells
   them nothing they could not see, and it is the only answer they can act on.
   `visible_one` and `require_owner` in `routes/libraries.rs` are the pair every
   future write should go through.
 - **The primary owner is recorded twice.** `libraries.owner_id` is the thing that
-  cannot be revoked; the same person also gets an ordinary membership with the
-  `owner` role and a null `invited_by` — nobody invited them. Permission checks
+  cannot be revoked; the same person also gets an ordinary membership with
+  `library_owner` and a null `invited_by` — nobody invited them. Permission checks
   read the membership, so a primary owner and an owner are the same to everything
   except `POST /libraries`. Keep it that way: the moment a check special-cases
   `owner_id`, every future one has to as well.
@@ -251,7 +258,7 @@ Working: the compose Postgres, the migration CLI, the axum server, the `users` /
 `user_identities` schema, first-run setup, password sign-in, and a server-rendered
 web app with `/setup`, `/login` and a `/dashboard` — the signed-in shell and the
 dashboard layout, drawn against an empty summary. Libraries end to end: the
-`roles` / `libraries` / `library_memberships` schema, `GET`/`POST /libraries` and
+`libraries` / `library_memberships` schema, `GET`/`POST /libraries` and
 `GET`/`PUT`/`DELETE /libraries/{id}`, a `/libraries` page that lists and creates
 them — each card carrying a menu to edit or delete it — and a
 `/libraries/{id}/settings` page that renames one, changes its description or
@@ -259,7 +266,8 @@ deletes it, read-only for a member who is not an owner.
 
 Not built yet: sharing a library — the roles and the membership table are there,
 but there is no endpoint to invite anyone, so every membership is its owner's,
-and the `owner`-only rule on writing to one has nobody to exclude yet. Handing a
+and the `library_owner`-only rule on writing to one has nobody to exclude yet.
+Handing a
 library over to a new primary owner. Every other domain endpoint (books, shelves,
 authors, series) and so the data behind the dashboard and behind
 `/libraries/{id}/books`, which is a stub. Password change and user management,
