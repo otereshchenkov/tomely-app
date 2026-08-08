@@ -16,6 +16,7 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DemoIdRouteImport } from './routes/demo.$id'
 import { Route as LibrariesIndexRouteImport } from './routes/libraries.index'
 import { Route as LibrariesLibraryIdBooksRouteImport } from './routes/libraries.$libraryId.books'
+import { Route as LibrariesLibraryIdSettingsRouteImport } from './routes/libraries.$libraryId.settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,12 @@ const LibrariesLibraryIdBooksRoute = LibrariesLibraryIdBooksRouteImport.update({
   path: '/libraries/$libraryId/books',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LibrariesLibraryIdSettingsRoute =
+  LibrariesLibraryIdSettingsRouteImport.update({
+    id: '/libraries/$libraryId/settings',
+    path: '/libraries/$libraryId/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/demo/$id': typeof DemoIdRoute
   '/libraries/': typeof LibrariesIndexRoute
   '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksRoute
+  '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +78,7 @@ export interface FileRoutesByTo {
   '/demo/$id': typeof DemoIdRoute
   '/libraries': typeof LibrariesIndexRoute
   '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksRoute
+  '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +89,7 @@ export interface FileRoutesById {
   '/demo/$id': typeof DemoIdRoute
   '/libraries/': typeof LibrariesIndexRoute
   '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksRoute
+  '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +101,7 @@ export interface FileRouteTypes {
     | '/demo/$id'
     | '/libraries/'
     | '/libraries/$libraryId/books'
+    | '/libraries/$libraryId/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +111,7 @@ export interface FileRouteTypes {
     | '/demo/$id'
     | '/libraries'
     | '/libraries/$libraryId/books'
+    | '/libraries/$libraryId/settings'
   id:
     | '__root__'
     | '/'
@@ -109,6 +121,7 @@ export interface FileRouteTypes {
     | '/demo/$id'
     | '/libraries/'
     | '/libraries/$libraryId/books'
+    | '/libraries/$libraryId/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +132,7 @@ export interface RootRouteChildren {
   DemoIdRoute: typeof DemoIdRoute
   LibrariesIndexRoute: typeof LibrariesIndexRoute
   LibrariesLibraryIdBooksRoute: typeof LibrariesLibraryIdBooksRoute
+  LibrariesLibraryIdSettingsRoute: typeof LibrariesLibraryIdSettingsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibrariesLibraryIdBooksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/libraries/$libraryId/settings': {
+      id: '/libraries/$libraryId/settings'
+      path: '/libraries/$libraryId/settings'
+      fullPath: '/libraries/$libraryId/settings'
+      preLoaderRoute: typeof LibrariesLibraryIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +204,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoIdRoute: DemoIdRoute,
   LibrariesIndexRoute: LibrariesIndexRoute,
   LibrariesLibraryIdBooksRoute: LibrariesLibraryIdBooksRoute,
+  LibrariesLibraryIdSettingsRoute: LibrariesLibraryIdSettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

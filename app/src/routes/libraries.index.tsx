@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useDisclosure } from '@mantine/hooks'
 import { z } from 'zod'
@@ -17,9 +17,12 @@ import { IconPlus } from '@tabler/icons-react'
 
 import { AppLayout } from '#/components/layout/AppLayout'
 import { RequireAuth } from '#/components/RequireAuth'
+import { DeleteLibraryModal } from '#/components/libraries/DeleteLibraryModal'
 import { LibraryCard } from '#/components/libraries/LibraryCard'
 import { NewLibraryModal } from '#/components/libraries/NewLibraryModal'
 import { useLibraries } from '#/lib/libraries'
+
+import type { Library } from '#/lib/libraries'
 
 /**
  * `?new` opens the create dialog on arrival, so somewhere else can send you here
@@ -92,6 +95,10 @@ function Libraries() {
 
 function LibrariesContent({ onCreate }: Readonly<{ onCreate: () => void }>) {
   const { data: libraries, isPending, error } = useLibraries()
+  // One dialog for the whole grid, holding the library it is about. A dialog
+  // owned by a card would be torn down by its own success: the card unmounts
+  // the instant the list cache drops the row.
+  const [toDelete, setToDelete] = useState<Library | null>(null)
 
   if (isPending) {
     return (
@@ -114,11 +121,30 @@ function LibrariesContent({ onCreate }: Readonly<{ onCreate: () => void }>) {
   }
 
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-      {libraries.map((library) => (
-        <LibraryCard key={library.id} library={library} />
-      ))}
-    </SimpleGrid>
+    <>
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+        {libraries.map((library) => (
+          <LibraryCard
+            key={library.id}
+            library={library}
+            onDelete={() => setToDelete(library)}
+          />
+        ))}
+      </SimpleGrid>
+
+      {/* Rendered only while there is something to ask about, which skips
+          Mantine's exit transition. Holding the last library so the dialog can
+          animate out would be more state than the animation is worth. No
+          `onDeleted`: there is nowhere to go, the card is already gone from the
+          list underneath. */}
+      {toDelete ? (
+        <DeleteLibraryModal
+          library={toDelete}
+          opened
+          onClose={() => setToDelete(null)}
+        />
+      ) : null}
+    </>
   )
 }
 

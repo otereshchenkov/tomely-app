@@ -13,6 +13,9 @@ pub enum ApiError {
     Unauthorized(String),
 
     #[error("{0}")]
+    Forbidden(String),
+
+    #[error("{0}")]
     NotFound(String),
 
     #[error("{0}")]
@@ -27,6 +30,7 @@ impl ApiError {
         match self {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::NotFound(_) => StatusCode::NOT_FOUND,
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -37,6 +41,7 @@ impl ApiError {
         match self {
             Self::BadRequest(_) => "BadRequest",
             Self::Unauthorized(_) => "Unauthorized",
+            Self::Forbidden(_) => "Forbidden",
             Self::NotFound(_) => "NotFound",
             Self::Conflict(_) => "Conflict",
             Self::Internal(_) => "InternalServer",
