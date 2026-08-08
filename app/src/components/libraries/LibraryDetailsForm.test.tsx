@@ -15,7 +15,7 @@ function aLibrary(overrides: Partial<Library> = {}): Library {
     description: 'Boxes I have not opened',
     ownerId: '0198c0f6-0000-7000-8000-000000000009',
     isPrimaryOwner: true,
-    role: 'owner',
+    role: 'library_owner',
     createdAt: '2026-08-07T00:00:00Z',
     updatedAt: '2026-08-07T00:00:00Z',
     ...overrides,
@@ -129,7 +129,10 @@ describe('LibraryDetailsForm', () => {
 
   it('shows a member who is not an owner what there is, and nothing to press', () => {
     renderWithProviders(
-      <LibraryDetailsForm library={aLibrary({ role: 'viewer' })} readOnly />,
+      <LibraryDetailsForm
+        library={aLibrary({ role: 'library_viewer' })}
+        readOnly
+      />,
     )
 
     expect(screen.getByLabelText<HTMLInputElement>('Name').disabled).toBe(true)

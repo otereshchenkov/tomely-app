@@ -15,6 +15,16 @@ import { useAuth } from './auth'
 
 import type { QueryClient } from '@tanstack/react-query'
 
+/**
+ * What a member may do in a library.
+ *
+ * The values of the `library_role` Postgres type (m0004) and of `LibraryRole` in
+ * `src/entities/sea_orm_active_enums.rs`, spelled the same on the wire. They carry
+ * the `library_` prefix because they say what somebody may do *in a library* - an
+ * instance-level role is a different question about a different scope.
+ */
+export type LibraryRole = 'library_owner' | 'library_editor' | 'library_viewer'
+
 /** Matches `LibraryResponse` in src/routes/libraries.rs. */
 export interface Library {
   id: string
@@ -26,8 +36,8 @@ export interface Library {
    *  puts the crown on the card. */
   isPrimaryOwner: boolean
   /** The caller's role in this library, not a property of the library itself.
-   *  `owner` is the one that may rename or delete it - see `canManage`. */
-  role: 'owner' | 'editor' | 'viewer'
+   *  `library_owner` is the one that may rename or delete it - see `canManage`. */
+  role: LibraryRole
   createdAt: string
   updatedAt: string
 }
@@ -118,7 +128,7 @@ export function deleteLibrary(id: string): Promise<void> {
  * `undefined` while the library is still loading, which is the same as no.
  */
 export function canManage(library: Library | undefined): boolean {
-  return library?.role === 'owner'
+  return library?.role === 'library_owner'
 }
 
 /** The order `GET /libraries` returns, so a locally added one lands where the

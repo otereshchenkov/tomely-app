@@ -18,7 +18,7 @@ function aLibrary(overrides: Partial<Library> = {}): Library {
     description: null,
     ownerId: '0198c0f6-0000-7000-8000-000000000009',
     isPrimaryOwner: true,
-    role: 'owner',
+    role: 'library_owner',
     createdAt: '2026-08-07T00:00:00Z',
     updatedAt: '2026-08-07T00:00:00Z',
     ...overrides,
@@ -29,17 +29,17 @@ describe('canManage', () => {
   it('is the role, not the crown', () => {
     // An owner who did not create the library may still rename it; the primary
     // owner of one they have been demoted in may not.
-    expect(canManage(aLibrary({ role: 'owner', isPrimaryOwner: false }))).toBe(
-      true,
-    )
-    expect(canManage(aLibrary({ role: 'viewer', isPrimaryOwner: true }))).toBe(
-      false,
-    )
+    expect(
+      canManage(aLibrary({ role: 'library_owner', isPrimaryOwner: false })),
+    ).toBe(true)
+    expect(
+      canManage(aLibrary({ role: 'library_viewer', isPrimaryOwner: true })),
+    ).toBe(false)
   })
 
   it('refuses editors and viewers', () => {
-    expect(canManage(aLibrary({ role: 'editor' }))).toBe(false)
-    expect(canManage(aLibrary({ role: 'viewer' }))).toBe(false)
+    expect(canManage(aLibrary({ role: 'library_editor' }))).toBe(false)
+    expect(canManage(aLibrary({ role: 'library_viewer' }))).toBe(false)
   })
 
   it('says no while there is nothing to say yes about', () => {

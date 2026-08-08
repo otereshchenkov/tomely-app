@@ -14,17 +14,19 @@ use axum::http::{Request, StatusCode, header};
 use chrono::Utc;
 use claims::assert_ok;
 use http_body_util::BodyExt;
-use sea_orm::{DatabaseBackend, IntoMockRow, MockDatabase, MockExecResult};
+use sea_orm::{ActiveEnum, DatabaseBackend, IntoMockRow, MockDatabase, MockExecResult};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 use uuid::Uuid;
 
 /// One row of the libraries-joined-to-membership projection the library routes
 /// select, keyed by the column names `LibraryRow` in `routes/libraries.rs`
-/// reads - `role` included, which is the alias on the joined role's name.
+/// reads - `role` included, which is the membership's own `library_role` column
+/// under an alias.
 type LibraryRow<'a> = BTreeMap<&'a str, sea_orm::Value>;
 
 use tomely_api::auth::JwtKeys;
+use tomely_api::entities::sea_orm_active_enums::LibraryRole;
 use tomely_api::entities::users;
 use tomely_api::{routes, state::AppState};
 
@@ -53,9 +55,9 @@ fn app(query_results: Vec<Vec<users::Model>>) -> Router {
 /// The same, for routes whose queries do not come back as any one entity's
 /// model.
 ///
-/// The library routes project three joined tables down to six columns and a
-/// role name, which is a `FromQueryResult` shape rather than a `Model` - so the
-/// rows go in as the columns `MockDatabase` keeps underneath either way.
+/// The library routes project a library joined to a membership down to six
+/// columns and a role, which is a `FromQueryResult` shape rather than a `Model` -
+/// so the rows go in as the columns `MockDatabase` keeps underneath either way.
 fn app_over_rows(query_results: Vec<Vec<LibraryRow<'_>>>) -> Router {
     router_over(query_results)
 }
@@ -172,7 +174,7 @@ fn delete(path: &str) -> Request<Body> {
 
 /// A library the caller is a member of, in the shape the membership join
 /// returns it.
-fn a_library_row(id: Uuid, owner: Uuid, role: &str) -> LibraryRow<'static> {
+fn a_library_row(id: Uuid, owner: Uuid, role: &LibraryRole) -> LibraryRow<'static> {
     // `DateTime<Utc>`, matching `LibraryRow`'s own columns - a fixed-offset
     // value here deserializes as a different type and the row silently fails to
     // build, which surfaces as a 500 rather than as anything useful.
@@ -183,7 +185,11 @@ fn a_library_row(id: Uuid, owner: Uuid, role: &str) -> LibraryRow<'static> {
         ("name", "Loft".into()),
         ("description", Option::<String>::None.into()),
         ("owner_id", owner.into()),
-        ("role", role.to_string().into()),
+        // A string, because that is what `TryGetable` reads a Postgres enum out
+        // of - but the enum's own spelling of it, not the Rust variant name.
+        // Anything `LibraryRole` cannot be built from surfaces as a 500 rather
+        // than as anything useful.
+        ("role", role.to_value().value.into_owned().into()),
         ("created_at", now.clone()),
         ("updated_at", now),
     ])
@@ -464,7 +470,11 @@ async fn a_member_who_is_not_an_owner_may_not_rename_a_library() {
     // left to hide by pretending it is not there.
     let id = Uuid::now_v7();
     let (status, body) = send(
-        app_over_rows(vec![vec![a_library_row(id, Uuid::now_v7(), "editor")]]),
+        app_over_rows(vec![vec![a_library_row(
+            id,
+            Uuid::now_v7(),
+            &LibraryRole::LibraryEditor,
+        )]]),
         put_with_token(
             &format!("/libraries/{id}"),
             &a_token(),
@@ -481,7 +491,11 @@ async fn a_member_who_is_not_an_owner_may_not_rename_a_library() {
 async fn a_member_who_is_not_an_owner_may_not_delete_a_library() {
     let id = Uuid::now_v7();
     let (status, body) = send(
-        app_over_rows(vec![vec![a_library_row(id, Uuid::now_v7(), "viewer")]]),
+        app_over_rows(vec![vec![a_library_row(
+            id,
+            Uuid::now_v7(),
+            &LibraryRole::LibraryViewer,
+        )]]),
         delete_with_token(&format!("/libraries/{id}"), &a_token()),
     )
     .await;
@@ -497,7 +511,11 @@ async fn an_owner_renaming_a_library_still_has_to_give_it_a_name() {
     // is what proves the owner got past the gate.
     let id = Uuid::now_v7();
     let (status, body) = send(
-        app_over_rows(vec![vec![a_library_row(id, Uuid::now_v7(), "owner")]]),
+        app_over_rows(vec![vec![a_library_row(
+            id,
+            Uuid::now_v7(),
+            &LibraryRole::LibraryOwner,
+        )]]),
         put_with_token(
             &format!("/libraries/{id}"),
             &a_token(),
