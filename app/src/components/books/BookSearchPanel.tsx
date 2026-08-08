@@ -92,7 +92,7 @@ export function BookSearchPanel({
         <Stack gap={6} role="status">
           <Progress value={100} animated size="sm" />
           <Text fz="sm" c="dimmed">
-            Searching providers...
+            Searching providers…
           </Text>
         </Stack>
       ) : null}

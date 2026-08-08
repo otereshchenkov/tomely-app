@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Anchor, Card, Center, Loader, Stack, Text } from '@mantine/core'
+import { Alert, Anchor, Card, Center, Loader, Stack, Text } from '@mantine/core'
 import { IconArrowLeft } from '@tabler/icons-react'
 import { z } from 'zod'
 
@@ -10,6 +10,7 @@ import { BookForm } from '#/components/books/BookForm'
 import { LibraryBreadcrumbs } from '#/components/libraries/LibraryBreadcrumbs'
 import { bookSearchQuery } from '#/lib/bookSearch'
 import { draftFromResult, emptyDraft } from '#/lib/books'
+import { useGenres, useMediaTypes } from '#/lib/catalogue'
 import { useLibrary } from '#/lib/libraries'
 
 // `q` is the search that produced `from`, and it is what makes the picked book
@@ -56,6 +57,8 @@ function NewBookContent() {
 
   const query = q ?? ''
   const { data, isPending, isFetching } = useQuery(bookSearchQuery(query))
+  const mediaTypes = useMediaTypes()
+  const genres = useGenres()
 
   const backToBooks = () => {
     void navigate({
@@ -65,12 +68,27 @@ function NewBookContent() {
   }
 
   // `BookForm` reads its defaults once, so it must not be mounted while the
-  // result it is meant to be filled in from is still being looked up.
-  if (from && (isPending || isFetching)) {
+  // result it is meant to be filled in from is still being looked up - nor while
+  // the two catalogues its fields are drawn from are, since a `Select` handed an
+  // empty list cannot show the value it already holds.
+  const waiting =
+    (from && (isPending || isFetching)) ||
+    mediaTypes.isPending ||
+    genres.isPending
+
+  if (waiting) {
     return (
       <Center mih={200}>
         <Loader />
       </Center>
+    )
+  }
+
+  if (mediaTypes.error || genres.error) {
+    return (
+      <Alert color="red" title="Could not load the book vocabulary">
+        {(mediaTypes.error ?? genres.error)?.message}
+      </Alert>
     )
   }
 
@@ -115,6 +133,8 @@ function NewBookContent() {
       <Card withBorder radius="md" padding="lg">
         <BookForm
           initial={picked ? draftFromResult(picked) : emptyDraft()}
+          mediaTypes={mediaTypes.data}
+          genres={genres.data}
           coverUrl={picked?.coverUrl ?? null}
           onCancel={backToBooks}
         />

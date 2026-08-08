@@ -1,39 +1,77 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { Alert, Center, Loader } from '@mantine/core'
+
 import { AppLayout } from '#/components/layout/AppLayout.tsx'
 import { RequireAuth } from '#/components/RequireAuth.tsx'
-import { Anchor, Breadcrumbs, Text } from '@mantine/core'
+import { CataloguePanel } from '#/components/settings/CataloguePanel'
+import { SettingsBreadcrumbs } from '#/components/settings/SettingsBreadcrumbs'
+import {
+  asEntries,
+  cacheEntry,
+  createGenre,
+  deleteGenre,
+  forgetEntry,
+  genresQueryKey,
+  updateGenre,
+  useGenres,
+} from '#/lib/catalogue'
 
 export const Route = createFileRoute('/admin/settings/genres')({
-  component: SettingsGeneralComponent,
+  component: GenresSettings,
 })
 
-function SettingsGeneralComponent() {
+function GenresSettings() {
   return (
     <AppLayout
-      title="General Settings"
-      breadcrumbs={
-        <Breadcrumbs
-          separator="/"
-          separatorMargin="xs"
-          fz="sm"
-          styles={{ breadcrumb: { fontSize: 'var(--mantine-font-size-sm)' } }}
-        >
-          <Anchor component={Link} to="/settings" c="dimmed" underline="hover">
-            Settings
-          </Anchor>
-          <Text c="dimmed" aria-current="page">
-            General
-          </Text>
-        </Breadcrumbs>
-      }
+      breadcrumbs={<SettingsBreadcrumbs current="Genres" />}
+      title="Genres"
+      subtitle="Instance-wide genre catalogue shared across all libraries."
     >
-      <RequireAuth>
-        <GeneralSettingsContent />
+      <RequireAuth isInstanceAdmin>
+        <GenresContent />
       </RequireAuth>
     </AppLayout>
   )
 }
 
-function GeneralSettingsContent() {
-  return <></>
+function GenresContent() {
+  const queryClient = useQueryClient()
+  const { data: genres, isPending, error } = useGenres()
+
+  if (isPending) {
+    return (
+      <Center mih={200}>
+        <Loader />
+      </Center>
+    )
+  }
+
+  if (error) {
+    return (
+      <Alert color="red" title="Could not load the genres">
+        {error.message}
+      </Alert>
+    )
+  }
+
+  return (
+    <CataloguePanel
+      // A genre has no description, so it is widened to the shape the shared
+      // panel draws rather than the panel learning which catalogue it has.
+      entries={asEntries(genres)}
+      noun="genre"
+      namePlaceholder="New genre name…"
+      onCreate={async (draft) => {
+        cacheEntry(queryClient, genresQueryKey, await createGenre(draft))
+      }}
+      onUpdate={async (id, draft) => {
+        cacheEntry(queryClient, genresQueryKey, await updateGenre(id, draft))
+      }}
+      onDelete={async (entry) => {
+        await deleteGenre(entry.id)
+        forgetEntry(queryClient, genresQueryKey, entry.id)
+      }}
+    />
+  )
 }

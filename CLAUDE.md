@@ -151,6 +151,41 @@ rather than a 403, so ids cannot be probed for.
   _caller_, not of the row. That is what lets a card draw the crown without a
   second request.
 
+### The instance catalogues
+
+Media types and genres are the vocabulary the whole instance describes its books
+with — `media_types` (m0005, name + optional description) and `genres` (m0006,
+name only), both seeded by their migration and both served by
+`src/routes/catalogue.rs`. Two tables in one route module because they are the
+same kind of thing; the validation, the ordering and the delete guard are shared.
+
+- **Instance-wide, not per-library.** A genre that meant something different in
+  each library would make "everything I own of this kind" a question with no
+  answer. That is also what decides the permissions: **reading takes
+  `CurrentUser`** — the book form is the main consumer and every signed-in reader
+  needs the whole list — and **writing takes `InstanceAdmin`**, because a rename
+  here is a rename in everybody's library at once.
+- **`InstanceAdmin` reads the row, never `claims.admin`.** It is the
+  `CurrentUser` sibling in `src/auth/extract.rs`, and it exists because a
+  "remember me" token lives for thirty days: the flag inside one is a photograph
+  of when it was signed. A caller whose rights were revoked this morning gets a
+  403 and a deactivated one gets a 401, whatever their token says.
+- **Names are unique case-insensitively**, through a `lower(name)` index like
+  m0001's on `users.email`. Nothing in the handlers looks for a duplicate —
+  `From<DbErr>` turns the violation into a 409. The client says "That genre
+  already exists" rather than passing Postgres' constraint name to somebody
+  looking at a settings page; `readable()` in `CataloguePanel` is where that
+  happens, and a 409 is the only conflict either endpoint can produce.
+- **`bookCount` is always 0 and is on the wire anyway.** There is no `books`
+  table to count, but the page draws a badge from it and disables delete above
+  zero, so the list and the guard are finished now and start telling the truth
+  when books land. `book_count()` and `require_unused()` in `catalogue.rs` are
+  the two places that will notice.
+- Editing them is `/admin/settings/media-types` and `/admin/settings/genres`,
+  both drawn by one `CataloguePanel` — it takes `CatalogueEntry`, so a genre is
+  widened with a null description by `asEntries` rather than the panel learning
+  which catalogue it has.
+
 ### Web app (`app/`)
 
 - File-based routes in `app/src/routes/`; `routeTree.gen.ts` is generated — never
@@ -206,13 +241,20 @@ a different book:
   still there. `?from` names the picked result inside that cached search rather than
   carrying a JSON blob through the address bar — and because the stand-in is
   deterministic, a cold cache just runs the same search again and finds it.
-- `app/src/lib/books.ts` holds the vocabulary — media types, contributor roles,
-  genres, languages, shelves — as constants, each marked as standing in for a table
-  that does not exist yet. Tags are the exception: free text, no list to fetch.
-  `draftFromResult` is the whole prefill rule, in one pure function.
+- `app/src/lib/books.ts` holds what is left of the vocabulary — contributor roles,
+  edition formats, languages, shelves — as constants, each marked as standing in
+  for a table that does not exist yet. Media types and genres are no longer among
+  them: they are rows, fetched through `app/src/lib/catalogue.ts`, and a
+  `BookDraft` holds their **ids**. That is why `DEFAULT_MEDIA_TYPE` is gone —
+  there is no server-side notion of a default one, so the field starts empty and
+  the required rule asks. Tags are the exception and always will be: free text, no
+  list to fetch. `draftFromResult` is the whole prefill rule, in one pure function.
 - `BookSearchPanel` and `BookForm` know nothing about the router; the routes hand
-  them their state and decide where their links go. `BookForm` must not be mounted
-  before its `initial` has settled — `useForm` reads `defaultValues` once.
+  them their state and decide where their links go. `BookForm` takes the two
+  catalogues as props for the same reason — the route owns the queries. It must
+  not be mounted before its `initial` **or** those lists have settled: `useForm`
+  reads `defaultValues` once, and a `Select` handed an empty list cannot show the
+  value it already holds.
 - Nothing saves. **Save book** is disabled inside `Soon`, like every other unbuilt
   control on the books page.
 
@@ -291,16 +333,23 @@ dashboard layout, drawn against an empty summary. Libraries end to end: the
 `GET`/`PUT`/`DELETE /libraries/{id}`, a `/libraries` page that lists and creates
 them — each card carrying a menu to edit or delete it — and a
 `/libraries/{id}/settings` page that renames one, changes its description or
-deletes it, read-only for a member who is not an owner.
+deletes it, read-only for a member who is not an owner. The instance catalogues
+end to end: the `media_types` / `genres` schema and its seed, `GET`/`POST` and
+`PUT`/`DELETE` on both, the `InstanceAdmin` extractor that gates the writes, and
+the `/admin/settings/media-types` and `/admin/settings/genres` pages that add,
+rename and remove entries — with the add-book form drawing its media type and
+genre fields from them.
 
 Drawn but not wired: `/libraries/{id}/books` and the two pages of the add-book
-wizard behind it — see below.
+wizard behind it — see below. Their vocabulary is real now; the book itself still
+has nowhere to be saved.
 
 Not built yet: sharing a library — the roles and the membership table are there,
 but there is no endpoint to invite anyone, so every membership is its owner's,
 and the `library_owner`-only rule on writing to one has nobody to exclude yet.
 Handing a
 library over to a new primary owner. Every domain endpoint (books, shelves,
-authors, series) and so the data behind the dashboard and behind the books page.
-Password change and user management, OIDC and passkey providers, and the
-Dockerfiles for the two services.
+authors, series) and so the data behind the dashboard and behind the books page —
+which is also why `bookCount` on a catalogue entry is always zero. General
+settings, which is a page with nothing on it yet. Password change and user
+management, OIDC and passkey providers, and the Dockerfiles for the two services.

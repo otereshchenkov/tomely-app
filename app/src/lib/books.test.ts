@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  DEFAULT_EDITION_FORMAT,
-  DEFAULT_MEDIA_TYPE,
-  draftFromResult,
-  emptyDraft,
-} from './books'
+import { DEFAULT_EDITION_FORMAT, draftFromResult, emptyDraft } from './books'
 
 import type { BookSearchResult } from './bookSearch'
 
@@ -33,11 +28,14 @@ describe('emptyDraft', () => {
     expect(emptyDraft().contributors).toEqual([{ name: '', role: 'Author' }])
   })
 
-  it('picks the defaults rather than leaving the selects empty', () => {
+  it('picks a default format, and leaves media type for the reader to choose', () => {
+    // Format is a constant this file can name; a media type is a row whose id
+    // nobody knows until the catalogue has been fetched, and the instance has no
+    // notion of a default one - so the field is required and starts empty.
     const draft = emptyDraft()
 
-    expect(draft.mediaType).toBe(DEFAULT_MEDIA_TYPE)
     expect(draft.edition.format).toBe(DEFAULT_EDITION_FORMAT)
+    expect(draft.mediaType).toBe('')
   })
 
   it('says "nothing yet" with empty values, never undefined', () => {
@@ -115,7 +113,10 @@ describe('draftFromResult', () => {
     expect(draft.edition.language).toBe('')
   })
 
-  it('leaves media type at the default - a provider does not know what it is', () => {
-    expect(draftFromResult(aResult()).mediaType).toBe(DEFAULT_MEDIA_TYPE)
+  it('leaves media type and genres unset - a provider does not know either', () => {
+    const draft = draftFromResult(aResult())
+
+    expect(draft.mediaType).toBe('')
+    expect(draft.genres).toEqual([])
   })
 })

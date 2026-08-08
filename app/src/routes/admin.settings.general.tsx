@@ -1,39 +1,29 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
+
 import { AppLayout } from '#/components/layout/AppLayout.tsx'
 import { RequireAuth } from '#/components/RequireAuth.tsx'
-import { Anchor, Breadcrumbs, Text } from '@mantine/core'
+import { SettingsBreadcrumbs } from '#/components/settings/SettingsBreadcrumbs'
 
 export const Route = createFileRoute('/admin/settings/general')({
-  component: SettingsGeneralComponent,
+  component: GeneralSettings,
 })
 
-function SettingsGeneralComponent() {
+function GeneralSettings() {
   return (
     <AppLayout
+      breadcrumbs={<SettingsBreadcrumbs current="General" />}
       title="General Settings"
-      breadcrumbs={
-        <Breadcrumbs
-          separator="/"
-          separatorMargin="xs"
-          fz="sm"
-          styles={{ breadcrumb: { fontSize: 'var(--mantine-font-size-sm)' } }}
-        >
-          <Anchor component={Link} to="/settings" c="dimmed" underline="hover">
-            Settings
-          </Anchor>
-          <Text c="dimmed" aria-current="page">
-            General
-          </Text>
-        </Breadcrumbs>
-      }
     >
-      <RequireAuth>
+      <RequireAuth isInstanceAdmin>
         <GeneralSettingsContent />
       </RequireAuth>
     </AppLayout>
   )
 }
 
+// Nothing to configure yet. The page exists because the settings grid links to
+// it, and an item that goes nowhere should land somewhere that says so rather
+// than 404.
 function GeneralSettingsContent() {
   return <></>
 }
