@@ -35,7 +35,13 @@ export const DEFAULT_MEDIA_TYPE = 'Novel'
 export const CONTRIBUTOR_ROLES = [
   'Author',
   'Co-author',
+  'Artist',
   'Illustrator',
+  'Writer',
+  'Penciller',
+  'Inker',
+  'Colorist',
+  'Letterer',
   'Translator',
   'Editor',
   'Narrator',

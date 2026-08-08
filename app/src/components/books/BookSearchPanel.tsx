@@ -76,7 +76,7 @@ export function BookSearchPanel({
         <Group gap="sm" align="flex-start" wrap="nowrap">
           <TextInput
             aria-label="Search for a book"
-            placeholder="Search by title, author, or ISBN…"
+            placeholder="Search by title, author, or ISBN..."
             data-autofocus
             flex={1}
             value={draft}
@@ -87,6 +87,15 @@ export function BookSearchPanel({
           </Button>
         </Group>
       </form>
+
+      {isSearching ? (
+        <Stack gap={6} role="status">
+          <Progress value={100} animated size="sm" />
+          <Text fz="sm" c="dimmed">
+            Searching providers...
+          </Text>
+        </Stack>
+      ) : null}
 
       {/* A `button` so the route decides where it goes, which means it is a
           block that would otherwise stretch across the stack and centre its
@@ -100,15 +109,6 @@ export function BookSearchPanel({
       >
         Add manually instead →
       </Anchor>
-
-      {isSearching ? (
-        <Stack gap={6} role="status">
-          <Progress value={100} animated size="sm" />
-          <Text fz="sm" c="dimmed">
-            Searching providers…
-          </Text>
-        </Stack>
-      ) : null}
 
       {hasSearched && !isSearching ? (
         <Results results={results} onPick={onPick} />

@@ -217,7 +217,6 @@ export function BookForm({
               withAsterisk
               data={[...MEDIA_TYPES]}
               allowDeselect={false}
-              maw={320}
               value={field.state.value}
               onChange={(value) => field.handleChange(value ?? '')}
               onBlur={field.handleBlur}
@@ -250,7 +249,6 @@ export function BookForm({
             {(field) => (
               <TagsInput
                 label="Tags"
-                description="Anything you like - press Enter to add one"
                 placeholder="Search or create tags…"
                 value={field.state.value}
                 onChange={field.handleChange}
@@ -522,7 +520,6 @@ function Edition({
                   data={LANGUAGES.map((language) => ({ ...language }))}
                   searchable
                   clearable
-                  maw={320}
                   value={field.state.value || null}
                   onChange={(value) => field.handleChange(value ?? '')}
                   onBlur={field.handleBlur}
@@ -569,7 +566,6 @@ function Edition({
                   min={1}
                   allowNegative={false}
                   allowDecimal={false}
-                  maw={320}
                   value={field.state.value}
                   onChange={field.handleChange}
                   onBlur={field.handleBlur}
