@@ -31,6 +31,9 @@ import {
   IconUserCircle,
   IconUsers,
   IconUsersGroup,
+  IconFileTypography,
+  IconDna2,
+  IconAdjustmentsAlt,
 } from '@tabler/icons-react'
 
 import { Mark } from '#/components/Mark'
@@ -141,7 +144,40 @@ function sectionsFor(libraryId: string | undefined): NavSection[] {
       adminOnly: true,
       items: [
         { label: 'Users', icon: IconUsers, activePath: null },
-        { label: 'Settings', icon: IconSettings, activePath: null },
+        {
+          label: 'Settings',
+          icon: IconSettings,
+          link: linkOptions({
+            to: '/admin/settings',
+          }),
+          activePath: '/admin/settings',
+          children: [
+            {
+              label: 'General',
+              icon: IconAdjustmentsAlt,
+              link: linkOptions({
+                to: '/admin/settings/general',
+              }),
+              activePath: '/admin/settings/general',
+            },
+            {
+              label: 'Media Types',
+              icon: IconFileTypography,
+              link: linkOptions({
+                to: '/admin/settings/media-types',
+              }),
+              activePath: '/admin/settings/media-types',
+            },
+            {
+              label: 'Genres',
+              icon: IconDna2,
+              link: linkOptions({
+                to: '/admin/settings/genres',
+              }),
+              activePath: '/admin/settings/genres',
+            },
+          ],
+        },
       ],
     },
   ]

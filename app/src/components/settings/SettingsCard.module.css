@@ -1,0 +1,44 @@
+/* The positioning context the stretched link anchors itself to. */
+.card {
+  position: relative;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.card:hover {
+  border-color: var(--mantine-primary-color-filled);
+  box-shadow: var(--mantine-shadow-sm);
+}
+
+/* The whole card is still the target, but the anchor itself now wraps only the
+   name - so its accessible name is the library's, and there is no button
+   nested inside a link, which is not markup a browser has to repair. */
+.link {
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* Keyboard focus has to be as obvious as hover. The ring goes round the card
+   rather than round the anchor, because the card is what the anchor covers. */
+.card:has(.link:focus-visible) {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/* Above the overlay, or the menu button cannot be clicked at all: the
+   pseudo-element would swallow every pointer event before it arrived. This one
+   line is the whole trick, and it is why the button needs no click handler of
+   its own to stop the link. */
+.menu {
+  position: relative;
+  z-index: 1;
+}

@@ -15,6 +15,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DemoIdRouteImport } from './routes/demo.$id'
 import { Route as LibrariesIndexRouteImport } from './routes/libraries.index'
+import { Route as AdminSettingsIndexRouteImport } from './routes/admin.settings.index'
+import { Route as AdminSettingsGeneralRouteImport } from './routes/admin.settings.general'
+import { Route as AdminSettingsGenresRouteImport } from './routes/admin.settings.genres'
+import { Route as AdminSettingsMediaTypesRouteImport } from './routes/admin.settings.media-types'
 import { Route as LibrariesLibraryIdSettingsRouteImport } from './routes/libraries.$libraryId.settings'
 import { Route as LibrariesLibraryIdBooksIndexRouteImport } from './routes/libraries.$libraryId.books.index'
 import { Route as LibrariesLibraryIdBooksAddRouteImport } from './routes/libraries.$libraryId.books.add'
@@ -50,6 +54,26 @@ const LibrariesIndexRoute = LibrariesIndexRouteImport.update({
   path: '/libraries/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSettingsIndexRoute = AdminSettingsIndexRouteImport.update({
+  id: '/admin/settings/',
+  path: '/admin/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsGeneralRoute = AdminSettingsGeneralRouteImport.update({
+  id: '/admin/settings/general',
+  path: '/admin/settings/general',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsGenresRoute = AdminSettingsGenresRouteImport.update({
+  id: '/admin/settings/genres',
+  path: '/admin/settings/genres',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsMediaTypesRoute = AdminSettingsMediaTypesRouteImport.update({
+  id: '/admin/settings/media-types',
+  path: '/admin/settings/media-types',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LibrariesLibraryIdSettingsRoute =
   LibrariesLibraryIdSettingsRouteImport.update({
     id: '/libraries/$libraryId/settings',
@@ -82,7 +106,11 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/demo/$id': typeof DemoIdRoute
   '/libraries/': typeof LibrariesIndexRoute
+  '/admin/settings/general': typeof AdminSettingsGeneralRoute
+  '/admin/settings/genres': typeof AdminSettingsGenresRoute
+  '/admin/settings/media-types': typeof AdminSettingsMediaTypesRoute
   '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
   '/libraries/$libraryId/books/add': typeof LibrariesLibraryIdBooksAddRoute
   '/libraries/$libraryId/books/new': typeof LibrariesLibraryIdBooksNewRoute
   '/libraries/$libraryId/books/': typeof LibrariesLibraryIdBooksIndexRoute
@@ -94,7 +122,11 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/demo/$id': typeof DemoIdRoute
   '/libraries': typeof LibrariesIndexRoute
+  '/admin/settings/general': typeof AdminSettingsGeneralRoute
+  '/admin/settings/genres': typeof AdminSettingsGenresRoute
+  '/admin/settings/media-types': typeof AdminSettingsMediaTypesRoute
   '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
+  '/admin/settings': typeof AdminSettingsIndexRoute
   '/libraries/$libraryId/books/add': typeof LibrariesLibraryIdBooksAddRoute
   '/libraries/$libraryId/books/new': typeof LibrariesLibraryIdBooksNewRoute
   '/libraries/$libraryId/books': typeof LibrariesLibraryIdBooksIndexRoute
@@ -107,7 +139,11 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/demo/$id': typeof DemoIdRoute
   '/libraries/': typeof LibrariesIndexRoute
+  '/admin/settings/general': typeof AdminSettingsGeneralRoute
+  '/admin/settings/genres': typeof AdminSettingsGenresRoute
+  '/admin/settings/media-types': typeof AdminSettingsMediaTypesRoute
   '/libraries/$libraryId/settings': typeof LibrariesLibraryIdSettingsRoute
+  '/admin/settings/': typeof AdminSettingsIndexRoute
   '/libraries/$libraryId/books/add': typeof LibrariesLibraryIdBooksAddRoute
   '/libraries/$libraryId/books/new': typeof LibrariesLibraryIdBooksNewRoute
   '/libraries/$libraryId/books/': typeof LibrariesLibraryIdBooksIndexRoute
@@ -121,7 +157,11 @@ export interface FileRouteTypes {
     | '/setup'
     | '/demo/$id'
     | '/libraries/'
+    | '/admin/settings/general'
+    | '/admin/settings/genres'
+    | '/admin/settings/media-types'
     | '/libraries/$libraryId/settings'
+    | '/admin/settings/'
     | '/libraries/$libraryId/books/add'
     | '/libraries/$libraryId/books/new'
     | '/libraries/$libraryId/books/'
@@ -133,7 +173,11 @@ export interface FileRouteTypes {
     | '/setup'
     | '/demo/$id'
     | '/libraries'
+    | '/admin/settings/general'
+    | '/admin/settings/genres'
+    | '/admin/settings/media-types'
     | '/libraries/$libraryId/settings'
+    | '/admin/settings'
     | '/libraries/$libraryId/books/add'
     | '/libraries/$libraryId/books/new'
     | '/libraries/$libraryId/books'
@@ -145,7 +189,11 @@ export interface FileRouteTypes {
     | '/setup'
     | '/demo/$id'
     | '/libraries/'
+    | '/admin/settings/general'
+    | '/admin/settings/genres'
+    | '/admin/settings/media-types'
     | '/libraries/$libraryId/settings'
+    | '/admin/settings/'
     | '/libraries/$libraryId/books/add'
     | '/libraries/$libraryId/books/new'
     | '/libraries/$libraryId/books/'
@@ -158,7 +206,11 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   DemoIdRoute: typeof DemoIdRoute
   LibrariesIndexRoute: typeof LibrariesIndexRoute
+  AdminSettingsGeneralRoute: typeof AdminSettingsGeneralRoute
+  AdminSettingsGenresRoute: typeof AdminSettingsGenresRoute
+  AdminSettingsMediaTypesRoute: typeof AdminSettingsMediaTypesRoute
   LibrariesLibraryIdSettingsRoute: typeof LibrariesLibraryIdSettingsRoute
+  AdminSettingsIndexRoute: typeof AdminSettingsIndexRoute
   LibrariesLibraryIdBooksAddRoute: typeof LibrariesLibraryIdBooksAddRoute
   LibrariesLibraryIdBooksNewRoute: typeof LibrariesLibraryIdBooksNewRoute
   LibrariesLibraryIdBooksIndexRoute: typeof LibrariesLibraryIdBooksIndexRoute
@@ -208,6 +260,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibrariesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/settings/': {
+      id: '/admin/settings/'
+      path: '/admin/settings'
+      fullPath: '/admin/settings/'
+      preLoaderRoute: typeof AdminSettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/settings/general': {
+      id: '/admin/settings/general'
+      path: '/admin/settings/general'
+      fullPath: '/admin/settings/general'
+      preLoaderRoute: typeof AdminSettingsGeneralRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/settings/genres': {
+      id: '/admin/settings/genres'
+      path: '/admin/settings/genres'
+      fullPath: '/admin/settings/genres'
+      preLoaderRoute: typeof AdminSettingsGenresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/settings/media-types': {
+      id: '/admin/settings/media-types'
+      path: '/admin/settings/media-types'
+      fullPath: '/admin/settings/media-types'
+      preLoaderRoute: typeof AdminSettingsMediaTypesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/libraries/$libraryId/settings': {
       id: '/libraries/$libraryId/settings'
       path: '/libraries/$libraryId/settings'
@@ -246,7 +326,11 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   DemoIdRoute: DemoIdRoute,
   LibrariesIndexRoute: LibrariesIndexRoute,
+  AdminSettingsGeneralRoute: AdminSettingsGeneralRoute,
+  AdminSettingsGenresRoute: AdminSettingsGenresRoute,
+  AdminSettingsMediaTypesRoute: AdminSettingsMediaTypesRoute,
   LibrariesLibraryIdSettingsRoute: LibrariesLibraryIdSettingsRoute,
+  AdminSettingsIndexRoute: AdminSettingsIndexRoute,
   LibrariesLibraryIdBooksAddRoute: LibrariesLibraryIdBooksAddRoute,
   LibrariesLibraryIdBooksNewRoute: LibrariesLibraryIdBooksNewRoute,
   LibrariesLibraryIdBooksIndexRoute: LibrariesLibraryIdBooksIndexRoute,

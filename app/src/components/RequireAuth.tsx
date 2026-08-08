@@ -15,8 +15,8 @@ import type { ReactNode } from 'react'
  * decides once the session has resolved - which is what keeps SSR ignorant of
  * auth.
  */
-export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
-  const { status } = useAuth()
+export function RequireAuth({ isInstanceAdmin, children }: Readonly<{ isInstanceAdmin?: boolean, children: ReactNode }>) {
+  const { status, user } = useAuth()
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   // This component stays mounted through the transition to /login, so without a
@@ -35,7 +35,7 @@ export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
       search: { redirect: pathname },
       replace: true,
     })
-  }, [status, navigate, pathname])
+  }, [status, navigate, pathname, user])
 
   if (status !== 'authenticated') {
     return (
@@ -43,6 +43,14 @@ export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
         <Loader />
       </Center>
     )
+  }
+
+  if (isInstanceAdmin && user?.isInstanceAdmin !== true) {
+      void navigate({
+        to: '/dashboard',
+        search: { redirect: pathname },
+        replace: true,
+      })
   }
 
   return <>{children}</>
