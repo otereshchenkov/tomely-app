@@ -1,35 +1,19 @@
 /**
  * The vocabulary a book is described with, and the shape of one being written.
  *
- * Every list below is a stand-in. Media types, contributor roles, genres,
- * languages and shelves are all things an instance will eventually own rows
- * for - genres and shelves certainly, since the point of a private library is
- * that it is arranged the way its owner wants. Until those endpoints exist they
- * are constants here, in one file, so replacing them is a change to this module
- * and not a search through the form.
+ * Media types and genres used to be constants here and are now rows - see
+ * `catalogue.ts` and the `/admin/settings` pages that edit them. What is left
+ * below is still a stand-in: contributor roles, edition formats, languages and
+ * shelves are all things an instance will eventually own rows for - shelves
+ * certainly, since the point of a private library is that it is arranged the way
+ * its owner wants. Until those endpoints exist they are constants here, in one
+ * file, so replacing them is a change to this module and not a search through
+ * the form.
  *
  * Tags are the exception and always will be: they are free text the reader
  * invents while typing, so there is no list to fetch.
  */
 import type { BookSearchResult } from './bookSearch'
-
-/** What kind of thing it is, rather than what it is printed on. */
-export const MEDIA_TYPES = [
-  'Novel',
-  'Novella',
-  'Short stories',
-  'Non-fiction',
-  'Manga',
-  'Comic',
-  'Graphic novel',
-  'Light novel',
-  'Poetry',
-  'Anthology',
-  'Reference',
-  'Textbook',
-] as const
-
-export const DEFAULT_MEDIA_TYPE = 'Novel'
 
 /** How a person is attached to a book. */
 export const CONTRIBUTOR_ROLES = [
@@ -66,42 +50,6 @@ export const EDITION_FORMATS = [
 export type EditionFormat = (typeof EDITION_FORMATS)[number]
 
 export const DEFAULT_EDITION_FORMAT: EditionFormat = 'Paperback'
-
-/**
- * A fixed set, unlike tags: a genre is a shared word, and letting every book
- * invent one is how a library ends up with "sci-fi", "Sci Fi" and "SF".
- */
-export const GENRES = [
-  'Adventure',
-  'Biography',
-  'Children',
-  'Classics',
-  'Contemporary',
-  'Crime',
-  'Dystopian',
-  'Essays',
-  'Fantasy',
-  'Historical',
-  'History',
-  'Horror',
-  'Humour',
-  'Literary fiction',
-  'Memoir',
-  'Mystery',
-  'Philosophy',
-  'Poetry',
-  'Politics',
-  'Popular science',
-  'Psychology',
-  'Romance',
-  'Science fiction',
-  'Self-help',
-  'Short stories',
-  'Thriller',
-  'Travel',
-  'True crime',
-  'Young adult',
-] as const
 
 /** ISO 639-1, because that is what a provider answers with. */
 export const LANGUAGES = [
@@ -160,20 +108,31 @@ export interface EditionDraft {
 export interface BookDraft {
   title: string
   subtitle: string
+  /** A `media_types` row id, or '' for "not chosen yet". */
   mediaType: string
   description: string
   contributors: Contributor[]
   tags: string[]
+  /** `genres` row ids. */
   genres: string[]
   shelves: string[]
   edition: EditionDraft
 }
 
+/**
+ * A blank book.
+ *
+ * `mediaType` starts empty rather than at some default. It used to be 'Novel',
+ * back when the list was a constant here and 'Novel' was a value this file could
+ * name; now it is a row whose id nobody knows until the catalogue has been
+ * fetched, and there is no server-side notion of a default one. The field is
+ * required, so the form asks rather than guessing.
+ */
 export function emptyDraft(): BookDraft {
   return {
     title: '',
     subtitle: '',
-    mediaType: DEFAULT_MEDIA_TYPE,
+    mediaType: '',
     description: '',
     contributors: [{ name: '', role: DEFAULT_CONTRIBUTOR_ROLE }],
     tags: [],

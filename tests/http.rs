@@ -11,7 +11,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use chrono::Utc;
+use chrono::{DateTime, FixedOffset, Utc};
 use claims::assert_ok;
 use http_body_util::BodyExt;
 use sea_orm::{ActiveEnum, DatabaseBackend, IntoMockRow, MockDatabase, MockExecResult};
@@ -19,11 +19,13 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-/// One row of the libraries-joined-to-membership projection the library routes
-/// select, keyed by the column names `LibraryRow` in `routes/libraries.rs`
-/// reads - `role` included, which is the membership's own `library_role` column
-/// under an alias.
-type LibraryRow<'a> = BTreeMap<&'a str, sea_orm::Value>;
+/// A database row as `MockDatabase` keeps one underneath: columns by name.
+///
+/// Used where the rows a route reads are not any one entity's `Model` - the
+/// libraries projection, which is a `FromQueryResult` shape - and where a single
+/// request queries two different tables, since the mock takes one row type for
+/// the whole conversation.
+type Row<'a> = BTreeMap<&'a str, sea_orm::Value>;
 
 use tomely_api::auth::JwtKeys;
 use tomely_api::entities::sea_orm_active_enums::LibraryRole;
@@ -47,6 +49,30 @@ fn a_user() -> users::Model {
     }
 }
 
+/// The same user, as the columns `InstanceAdmin` reads them back out of.
+///
+/// A `BTreeMap` rather than the `Model` above because a request that gets past
+/// that extractor goes on to query something else, and `MockDatabase` takes one
+/// row type for the whole conversation - so the user has to be expressible in
+/// the same shape as whatever follows it.
+fn a_user_row(is_instance_admin: bool, is_active: bool) -> Row<'static> {
+    let now: sea_orm::Value = Utc::now().fixed_offset().into();
+
+    BTreeMap::from([
+        ("id", Uuid::now_v7().into()),
+        ("display_name", "Jane Doe".into()),
+        ("email", "jane@example.com".into()),
+        ("is_active", is_active.into()),
+        ("is_instance_admin", is_instance_admin.into()),
+        (
+            "last_login_at",
+            Option::<DateTime<FixedOffset>>::None.into(),
+        ),
+        ("created_at", now.clone()),
+        ("updated_at", now),
+    ])
+}
+
 /// A router whose database answers each query with the next batch given.
 fn app(query_results: Vec<Vec<users::Model>>) -> Router {
     router_over(query_results)
@@ -58,7 +84,9 @@ fn app(query_results: Vec<Vec<users::Model>>) -> Router {
 /// The library routes project a library joined to a membership down to six
 /// columns and a role, which is a `FromQueryResult` shape rather than a `Model` -
 /// so the rows go in as the columns `MockDatabase` keeps underneath either way.
-fn app_over_rows(query_results: Vec<Vec<LibraryRow<'_>>>) -> Router {
+/// The catalogue routes use it for a different reason: `InstanceAdmin` reads a
+/// `users` row before the handler reads anything else.
+fn app_over_rows(query_results: Vec<Vec<Row<'_>>>) -> Router {
     router_over(query_results)
 }
 
@@ -174,7 +202,7 @@ fn delete(path: &str) -> Request<Body> {
 
 /// A library the caller is a member of, in the shape the membership join
 /// returns it.
-fn a_library_row(id: Uuid, owner: Uuid, role: &LibraryRole) -> LibraryRow<'static> {
+fn a_library_row(id: Uuid, owner: Uuid, role: &LibraryRole) -> Row<'static> {
     // `DateTime<Utc>`, matching `LibraryRow`'s own columns - a fixed-offset
     // value here deserializes as a different type and the row silently fails to
     // build, which surfaces as a 500 rather than as anything useful.
@@ -526,6 +554,155 @@ async fn an_owner_renaming_a_library_still_has_to_give_it_a_name() {
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(body["message"], "Name is required");
+}
+
+/// A media type as its own table stores it.
+fn a_media_type_row(id: Uuid) -> Row<'static> {
+    let now: sea_orm::Value = Utc::now().fixed_offset().into();
+
+    BTreeMap::from([
+        ("id", id.into()),
+        ("name", "Light Novel".into()),
+        (
+            "description",
+            Some("Japanese illustrated prose".to_string()).into(),
+        ),
+        ("created_at", now.clone()),
+        ("updated_at", now),
+    ])
+}
+
+#[tokio::test]
+async fn reading_the_catalogue_needs_a_token() {
+    for path in ["/media-types", "/genres"] {
+        let (status, _) = send(app(vec![]), get(path)).await;
+
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+}
+
+#[tokio::test]
+async fn writing_to_the_catalogue_needs_a_token() {
+    let id = Uuid::now_v7();
+
+    for request in [
+        post("/media-types", &json!({ "name": "Zine" })),
+        put(&format!("/genres/{id}"), &json!({ "name": "Zine" })),
+        delete(&format!("/genres/{id}")),
+    ] {
+        let (status, _) = send(app(vec![]), request).await;
+
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+}
+
+#[tokio::test]
+async fn anybody_signed_in_may_read_the_catalogue() {
+    // Not admin-only, deliberately: the book form draws its media type field
+    // from this, so a reader who may never edit the list still needs all of it.
+    // A read takes `CurrentUser`, so there is no `users` row to answer first -
+    // the list itself is the only query.
+    let (status, body) = send(
+        app_over_rows(vec![vec![]]),
+        get_with_token("/media-types", &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, json!([]));
+}
+
+#[tokio::test]
+async fn a_signed_in_user_who_is_not_an_admin_may_not_write_to_the_catalogue() {
+    // The token says `admin: true` - `a_token()` signs `a_user()`, who is one -
+    // and the row says otherwise. The row wins, which is the whole reason
+    // `InstanceAdmin` reads it.
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_user_row(false, true)]]),
+        post_with_token("/genres", &a_token(), &json!({ "name": "Cosy Mystery" })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body["error"], "Forbidden");
+}
+
+#[tokio::test]
+async fn a_deactivated_admin_is_not_authenticated_at_all() {
+    // A 401 rather than the 403 a plain user gets: a deactivated account is not
+    // somebody who may not do this, it is nobody.
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_user_row(true, false)]]),
+        post_with_token("/genres", &a_token(), &json!({ "name": "Cosy Mystery" })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"], "Unauthorized");
+}
+
+#[tokio::test]
+async fn an_admin_adding_a_media_type_still_has_to_name_it() {
+    // Permission is checked before the name is - `InstanceAdmin` is an extractor,
+    // so it runs before the handler body. Reaching a 400 is what proves the admin
+    // got past the gate.
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_user_row(true, true)]]),
+        post_with_token("/media-types", &a_token(), &json!({ "name": "   " })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["message"], "Name is required");
+}
+
+#[tokio::test]
+async fn renaming_something_that_is_not_there_is_a_404() {
+    let id = Uuid::now_v7();
+    let (status, body) = send(
+        // The admin row, then nothing where the media type would be.
+        app_over_rows(vec![vec![a_user_row(true, true)], vec![]]),
+        put_with_token(
+            &format!("/media-types/{id}"),
+            &a_token(),
+            &json!({ "name": "Zine" }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["error"], "NotFound");
+}
+
+#[tokio::test]
+async fn deleting_something_that_is_not_there_is_a_404() {
+    let id = Uuid::now_v7();
+    let (status, _) = send(
+        app_over_rows(vec![vec![a_user_row(true, true)], vec![]]),
+        delete_with_token(&format!("/genres/{id}"), &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_media_type_carries_a_book_count_the_page_can_draw() {
+    // Zero until there is a `books` table, but on the wire now: the list draws a
+    // badge from it and refuses delete when it is not zero, so the shape has to
+    // be right before the number can become interesting.
+    let id = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_media_type_row(id)]]),
+        get_with_token("/media-types", &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body[0]["name"], "Light Novel");
+    assert_eq!(body[0]["bookCount"], 0);
+    // camelCase on the wire, like every other response here.
+    assert!(body[0]["createdAt"].is_string());
 }
 
 #[tokio::test]

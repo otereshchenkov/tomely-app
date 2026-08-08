@@ -34,16 +34,20 @@ import {
   CONTRIBUTOR_ROLES,
   DEFAULT_CONTRIBUTOR_ROLE,
   EDITION_FORMATS,
-  GENRES,
   LANGUAGES,
-  MEDIA_TYPES,
   SHELVES,
 } from '#/lib/books'
 
 import classes from './BookForm.module.css'
 
 import type { BookDraft, EditionFormat } from '#/lib/books'
+import type { Genre, MediaType } from '#/lib/catalogue'
 import type { TablerIcon } from '@tabler/icons-react'
+
+/** A catalogue row as Mantine's `Select`/`MultiSelect` want it: id, then label. */
+function options(entries: Array<{ id: string; name: string }>) {
+  return entries.map((entry) => ({ value: entry.id, label: entry.name }))
+}
 
 const FORMAT_ICONS: Record<EditionFormat, TablerIcon> = {
   Paperback: IconBook,
@@ -139,13 +143,22 @@ type ErrorFor = (name: string) => string | undefined
  * search result is still being resolved keeps the empty draft for good, with
  * nothing anywhere to say why. `LibraryDetailsForm` carries the same warning
  * and the routes gate on it the same way.
+ *
+ * The two catalogues arrive as props rather than being fetched here, so this
+ * stays as router-free and request-free as it has always been - and so the same
+ * gate that waits for `initial` covers them too.
  */
 export function BookForm({
   initial,
+  mediaTypes,
+  genres,
   coverUrl = null,
   onCancel,
 }: Readonly<{
   initial: BookDraft
+  /** The instance's media types, in the order `GET /media-types` returns them. */
+  mediaTypes: Array<MediaType>
+  genres: Array<Genre>
   /** The cover of the search result this was filled in from. Shown, not
    *  edited - uploading one is a later job. */
   coverUrl?: string | null
@@ -215,9 +228,13 @@ export function BookForm({
             <Select
               label="Media type"
               withAsterisk
-              data={[...MEDIA_TYPES]}
+              placeholder="— select —"
+              data={options(mediaTypes)}
+              searchable
               allowDeselect={false}
-              value={field.state.value}
+              // `Select` wants null for "nothing chosen"; the draft says '' so
+              // that every field of it is a string.
+              value={field.state.value || null}
               onChange={(value) => field.handleChange(value ?? '')}
               onBlur={field.handleBlur}
               error={errorFor('mediaType')}
@@ -265,7 +282,7 @@ export function BookForm({
                 placeholder={
                   field.state.value.length > 0 ? undefined : 'Search genres…'
                 }
-                data={[...GENRES]}
+                data={options(genres)}
                 searchable
                 clearable
                 hidePickedOptions

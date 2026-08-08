@@ -2,8 +2,10 @@
 
 pub mod prelude;
 
+pub mod genres;
 pub mod libraries;
 pub mod library_memberships;
+pub mod media_types;
 pub mod sea_orm_active_enums;
 pub mod user_identities;
 pub mod users;

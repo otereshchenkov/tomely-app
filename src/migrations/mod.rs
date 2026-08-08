@@ -24,6 +24,8 @@ mod m0001_create_users;
 mod m0002_create_user_identities;
 mod m0003_create_libraries;
 mod m0004_create_library_memberships;
+mod m0005_create_media_types;
+mod m0006_create_genres;
 
 pub struct Migrator;
 
@@ -35,6 +37,8 @@ impl MigratorTrait for Migrator {
             Box::new(m0002_create_user_identities::Migration),
             Box::new(m0003_create_libraries::Migration),
             Box::new(m0004_create_library_memberships::Migration),
+            Box::new(m0005_create_media_types::Migration),
+            Box::new(m0006_create_genres::Migration),
         ]
     }
 }

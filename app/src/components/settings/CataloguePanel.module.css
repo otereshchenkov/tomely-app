@@ -1,0 +1,44 @@
+/* The add row sits above the list inside one bordered card, so the two read as
+   one control rather than as a form that happens to be near a table. */
+.panel {
+  overflow: hidden;
+}
+
+.form {
+  padding: var(--mantine-spacing-md);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.row {
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+/* The last row's border would double up with the card's own. */
+.row:last-of-type {
+  border-bottom: none;
+}
+
+.row:hover {
+  background-color: var(--mantine-color-default-hover);
+}
+
+/* The actions are quiet until the row is pointed at or something in it has
+   keyboard focus - twenty-five rows of full-strength icons is a wall. They stay
+   at full opacity for anyone who has turned motion and subtle cues down. */
+.actions {
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actions {
+    opacity: 1;
+    transition: none;
+  }
+}

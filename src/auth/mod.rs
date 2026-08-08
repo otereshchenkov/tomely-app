@@ -11,6 +11,6 @@ pub mod extract;
 pub mod jwt;
 pub mod password;
 
-pub use extract::CurrentUser;
+pub use extract::{CurrentUser, InstanceAdmin};
 pub use jwt::{Claims, JwtKeys};
 pub use password::{hash_password, verify_dummy_password, verify_password};
