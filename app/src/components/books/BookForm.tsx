@@ -1,8 +1,10 @@
+import { useMemo } from 'react'
 import { useForm } from '@tanstack/react-form'
 import {
   Accordion,
   Anchor,
   Button,
+  CheckIcon,
   Chip,
   CloseButton,
   Group,
@@ -47,6 +49,42 @@ import type { TablerIcon } from '@tabler/icons-react'
 /** A catalogue row as Mantine's `Select`/`MultiSelect` want it: id, then label. */
 function options(entries: Array<{ id: string; name: string }>) {
   return entries.map((entry) => ({ value: entry.id, label: entry.name }))
+}
+
+/**
+ * A media type in the dropdown: its name, and what the instance says it means.
+ *
+ * "Manga" and "Manhwa" and "Manhua" are three words a reader may not be able to
+ * tell apart from the name alone, and the settings page already asks somebody to
+ * write down the difference - so the list that matters shows it rather than
+ * making them go and look.
+ *
+ * The check icon has to be drawn here: `renderOption` replaces the whole option
+ * body, including the one Mantine would otherwise put in. It keeps its space
+ * when absent so the names stay in a column instead of stepping sideways as the
+ * selection moves.
+ */
+function MediaTypeOption({
+  label,
+  description,
+  checked,
+}: Readonly<{ label: string; description: string | null; checked: boolean }>) {
+  return (
+    <Group gap="xs" wrap="nowrap" align="flex-start">
+      <CheckIcon
+        size={12}
+        style={{ marginTop: 5, visibility: checked ? 'visible' : 'hidden' }}
+      />
+      <Stack gap={0}>
+        <Text fz="sm">{label}</Text>
+        {description ? (
+          <Text fz="xs" c="dimmed">
+            {description}
+          </Text>
+        ) : null}
+      </Stack>
+    </Group>
+  )
 }
 
 const FORMAT_ICONS: Record<EditionFormat, TablerIcon> = {
@@ -167,6 +205,13 @@ export function BookForm({
   const form = useBookForm(initial)
   const errorFor = useFieldErrors(form)
 
+  // `renderOption` is handed a `ComboboxItem` - a value and a label, and nothing
+  // else - so the description has to be looked up by id.
+  const mediaTypeDescriptions = useMemo(
+    () => new Map(mediaTypes.map((type) => [type.id, type.description])),
+    [mediaTypes],
+  )
+
   return (
     <form
       onSubmit={(event) => {
@@ -232,6 +277,16 @@ export function BookForm({
               data={options(mediaTypes)}
               searchable
               allowDeselect={false}
+              // Two lines an option rather than 220px' worth of one, which is
+              // three and a half rows of a fourteen-row list.
+              maxDropdownHeight={320}
+              renderOption={({ option, checked }) => (
+                <MediaTypeOption
+                  label={option.label}
+                  description={mediaTypeDescriptions.get(option.value) ?? null}
+                  checked={checked === true}
+                />
+              )}
               // `Select` wants null for "nothing chosen"; the draft says '' so
               // that every field of it is a string.
               value={field.state.value || null}

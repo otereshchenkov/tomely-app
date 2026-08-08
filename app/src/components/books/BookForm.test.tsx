@@ -16,7 +16,7 @@ const MEDIA_TYPES: Array<MediaType> = [
   {
     id: 'mt-novel',
     name: 'Novel',
-    description: null,
+    description: 'Full-length fiction or non-fiction book',
     bookCount: 0,
     createdAt: '',
     updatedAt: '',
@@ -24,6 +24,15 @@ const MEDIA_TYPES: Array<MediaType> = [
   {
     id: 'mt-manga',
     name: 'Manga',
+    description: 'Japanese comic book / graphic novel',
+    bookCount: 0,
+    createdAt: '',
+    updatedAt: '',
+  },
+  // One without a description, since the column is optional.
+  {
+    id: 'mt-zine',
+    name: 'Zine',
     description: null,
     bookCount: 0,
     createdAt: '',
@@ -83,10 +92,12 @@ const combo = (name: string) =>
 // The click lands regardless: `user-event` gates on `pointer-events`, not on
 // what is painted. Real browsers, and the a11y test that would care, see an
 // ordinary listbox.
-const option = (name: string) =>
+// A media type option's accessible name is its name *and* its description run
+// together, so these take a matcher rather than a string.
+const option = (name: string | RegExp) =>
   screen.findByRole('option', { name, hidden: true })
 
-const options = (name: string) =>
+const options = (name: string | RegExp) =>
   screen.findAllByRole('option', { name, hidden: true }).catch(() => [])
 
 describe('BookForm', () => {
@@ -120,11 +131,38 @@ describe('BookForm', () => {
     )
 
     await user.click(combo('Media type'))
-    await user.click(await option('Manga'))
+    await user.click(await option(/^Manga/))
 
     // The draft holds the id; the field shows the name, which is the whole point
     // of the options being built from rows rather than from strings.
     expect(combo('Media type').value).toBe('Manga')
+  })
+
+  it('says what each media type means, since the names alone do not', async () => {
+    // "Manga", "Manhwa" and "Manhua" are not words most readers can tell apart,
+    // and the settings page has already asked somebody to write down the
+    // difference - so the list that matters shows it.
+    const user = userEvent.setup()
+
+    renderWithProviders(
+      <BookForm
+        initial={emptyDraft()}
+        mediaTypes={MEDIA_TYPES}
+        genres={GENRES}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(combo('Media type'))
+
+    expect(
+      await option('Manga Japanese comic book / graphic novel'),
+    ).toBeTruthy()
+    expect(
+      await option('Novel Full-length fiction or non-fiction book'),
+    ).toBeTruthy()
+    // The column is optional, so one without a description is just its name.
+    expect(await option('Zine')).toBeTruthy()
   })
 
   it('arrives filled in from a picked result', () => {
