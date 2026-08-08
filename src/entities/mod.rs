@@ -7,5 +7,6 @@ pub mod libraries;
 pub mod library_memberships;
 pub mod media_types;
 pub mod sea_orm_active_enums;
+pub mod tags;
 pub mod user_identities;
 pub mod users;

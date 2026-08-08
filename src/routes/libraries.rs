@@ -179,6 +179,22 @@ async fn visible_one<C: ConnectionTrait>(
         .ok_or_else(|| ApiError::NotFound("No such library".to_string()))
 }
 
+/// What the caller may do in a library, or the 404 a stranger gets.
+///
+/// The seam the rest of `routes` reaches the membership check through: things
+/// that live *inside* a library - tags today, books and shelves later - have to
+/// answer "is this caller in here, and as what?" and nothing else. `LibraryRow`
+/// stays private because none of them needs the library's own columns to decide
+/// what may be done to the things in it, and `visible_one` stays the one place
+/// the 404 is decided.
+pub(super) async fn member_role<C: ConnectionTrait>(
+    db: &C,
+    caller: Uuid,
+    library: Uuid,
+) -> Result<LibraryRole, ApiError> {
+    Ok(visible_one(db, caller, library).await?.role)
+}
+
 /// The gate on changing a library at all.
 ///
 /// The role comes from the *membership*, never from `libraries.owner_id`. The
@@ -197,6 +213,26 @@ fn require_owner(role: &LibraryRole) -> Result<(), ApiError> {
 
     Err(ApiError::Forbidden(
         "Only an owner can change or delete a library".to_string(),
+    ))
+}
+
+/// The gate on changing what is *in* a library.
+///
+/// Separate from `require_owner`, and deliberately looser: that one guards the
+/// library row - its name, its existence - which is the owner's to decide. This
+/// one guards the contents, and an editor is by definition somebody trusted to
+/// file things here. A reader who may add a book may invent the word they file
+/// it under, or the tag list belongs to whoever happens to hold the crown.
+///
+/// A 403 for the same reason `require_owner` gives: it is only ever reached
+/// once `member_role` has already shown the library exists.
+pub(super) fn require_editor(role: &LibraryRole) -> Result<(), ApiError> {
+    if matches!(role, LibraryRole::LibraryOwner | LibraryRole::LibraryEditor) {
+        return Ok(());
+    }
+
+    Err(ApiError::Forbidden(
+        "Only an owner or an editor can change this library's contents".to_string(),
     ))
 }
 
@@ -451,6 +487,22 @@ mod tests {
         ));
         assert!(matches!(
             require_owner(&LibraryRole::LibraryViewer),
+            Err(ApiError::Forbidden(_))
+        ));
+    }
+
+    #[test]
+    fn an_owner_or_an_editor_may_change_what_is_in_one() {
+        assert_ok!(require_editor(&LibraryRole::LibraryOwner));
+        assert_ok!(require_editor(&LibraryRole::LibraryEditor));
+    }
+
+    #[test]
+    fn a_viewer_may_not() {
+        // The one role the two gates disagree about, which is the whole reason
+        // there are two of them.
+        assert!(matches!(
+            require_editor(&LibraryRole::LibraryViewer),
             Err(ApiError::Forbidden(_))
         ));
     }

@@ -705,6 +705,165 @@ async fn a_media_type_carries_a_book_count_the_page_can_draw() {
     assert!(body[0]["createdAt"].is_string());
 }
 
+/// A tag as its own table stores it.
+fn a_tag_row(id: Uuid, library: Uuid) -> Row<'static> {
+    let now: sea_orm::Value = Utc::now().fixed_offset().into();
+
+    BTreeMap::from([
+        ("id", id.into()),
+        ("library_id", library.into()),
+        ("name", "heroic".into()),
+        ("color", Some("blue".to_string()).into()),
+        ("created_at", now.clone()),
+        ("updated_at", now),
+    ])
+}
+
+#[tokio::test]
+async fn reading_a_librarys_tags_needs_a_token() {
+    let (status, _) = send(
+        app(vec![]),
+        get(&format!("/libraries/{}/tags", Uuid::now_v7())),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn any_member_may_read_the_tags_of_a_library_they_are_in() {
+    // Two queries in one request - the membership, then the tags - which is why
+    // both rows have to be expressible in the one shape the mock takes.
+    let library = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![
+            vec![a_library_row(
+                library,
+                Uuid::now_v7(),
+                &LibraryRole::LibraryViewer,
+            )],
+            vec![a_tag_row(Uuid::now_v7(), library)],
+        ]),
+        get_with_token(&format!("/libraries/{library}/tags"), &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body[0]["name"], "heroic");
+    assert_eq!(body[0]["color"], "blue");
+    // camelCase on the wire, like every other response here.
+    assert_eq!(body[0]["libraryId"], library.to_string());
+    assert!(body[0]["createdAt"].is_string());
+}
+
+#[tokio::test]
+async fn a_library_the_caller_is_not_in_has_no_tags_to_see() {
+    // The same 404 the library itself gives a stranger, and for the same reason:
+    // the tags are behind `member_role`, so there is nothing here to probe with.
+    let (status, body) = send(
+        app_over_rows(vec![vec![]]),
+        get_with_token(&format!("/libraries/{}/tags", Uuid::now_v7()), &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["error"], "NotFound");
+}
+
+#[tokio::test]
+async fn a_viewer_may_not_add_a_tag() {
+    // A 403 rather than a 404: a viewer can already see the library and its
+    // tags, so pretending it is not there would tell them nothing.
+    let library = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_library_row(
+            library,
+            Uuid::now_v7(),
+            &LibraryRole::LibraryViewer,
+        )]]),
+        post_with_token(
+            &format!("/libraries/{library}/tags"),
+            &a_token(),
+            &json!({ "name": "heroic" }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body["error"], "Forbidden");
+}
+
+#[tokio::test]
+async fn an_editor_adding_a_tag_still_has_to_name_it() {
+    // The gate the library's own writes refuse an editor at - reaching a 400 is
+    // what proves this one lets them through.
+    let library = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_library_row(
+            library,
+            Uuid::now_v7(),
+            &LibraryRole::LibraryEditor,
+        )]]),
+        post_with_token(
+            &format!("/libraries/{library}/tags"),
+            &a_token(),
+            &json!({ "name": "   " }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["message"], "Name is required");
+}
+
+#[tokio::test]
+async fn a_colour_off_the_palette_never_reaches_the_column() {
+    let library = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_library_row(
+            library,
+            Uuid::now_v7(),
+            &LibraryRole::LibraryOwner,
+        )]]),
+        post_with_token(
+            &format!("/libraries/{library}/tags"),
+            &a_token(),
+            &json!({ "name": "heroic", "color": "#4c6ef5" }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["message"], "That is not a tag colour");
+}
+
+#[tokio::test]
+async fn a_tag_belonging_to_another_library_is_not_there() {
+    // The membership passes - this caller really is an owner of the library in
+    // the path - and the tag lookup is what refuses, because it filters on the
+    // library as well as on the id.
+    let library = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![
+            vec![a_library_row(
+                library,
+                Uuid::now_v7(),
+                &LibraryRole::LibraryOwner,
+            )],
+            vec![],
+        ]),
+        put_with_token(
+            &format!("/libraries/{library}/tags/{}", Uuid::now_v7()),
+            &a_token(),
+            &json!({ "name": "heroic" }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["message"], "No such tag");
+}
+
 #[tokio::test]
 async fn health_still_works() {
     let (status, body) = send(app(vec![]), get("/health")).await;

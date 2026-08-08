@@ -12,6 +12,7 @@ import { bookSearchQuery } from '#/lib/bookSearch'
 import { draftFromResult, emptyDraft } from '#/lib/books'
 import { useGenres, useMediaTypes } from '#/lib/catalogue'
 import { useLibrary } from '#/lib/libraries'
+import { useTags } from '#/lib/tags'
 
 // `q` is the search that produced `from`, and it is what makes the picked book
 // recoverable: the results are still in the query cache under it, and a cold
@@ -59,6 +60,7 @@ function NewBookContent() {
   const { data, isPending, isFetching } = useQuery(bookSearchQuery(query))
   const mediaTypes = useMediaTypes()
   const genres = useGenres()
+  const tags = useTags(libraryId)
 
   const backToBooks = () => {
     void navigate({
@@ -69,12 +71,18 @@ function NewBookContent() {
 
   // `BookForm` reads its defaults once, so it must not be mounted while the
   // result it is meant to be filled in from is still being looked up - nor while
-  // the two catalogues its fields are drawn from are, since a `Select` handed an
-  // empty list cannot show the value it already holds.
+  // the lists its fields are drawn from are, since a `Select` handed an empty
+  // list cannot show the value it already holds.
+  //
+  // The tags are in here with the two catalogues even though they are only
+  // suggestions and a `TagsInput` handed none still works: a field that silently
+  // offers nothing for the first second reads as a library with no tags, which
+  // is a different and wrong answer.
   const waiting =
     (from && (isPending || isFetching)) ||
     mediaTypes.isPending ||
-    genres.isPending
+    genres.isPending ||
+    tags.isPending
 
   if (waiting) {
     return (
@@ -84,10 +92,10 @@ function NewBookContent() {
     )
   }
 
-  if (mediaTypes.error || genres.error) {
+  if (mediaTypes.error || genres.error || tags.error) {
     return (
       <Alert color="red" title="Could not load the book vocabulary">
-        {(mediaTypes.error ?? genres.error)?.message}
+        {(mediaTypes.error ?? genres.error ?? tags.error)?.message}
       </Alert>
     )
   }
@@ -135,6 +143,7 @@ function NewBookContent() {
           initial={picked ? draftFromResult(picked) : emptyDraft()}
           mediaTypes={mediaTypes.data}
           genres={genres.data}
+          tags={tags.data}
           coverUrl={picked?.coverUrl ?? null}
           onCancel={backToBooks}
         />

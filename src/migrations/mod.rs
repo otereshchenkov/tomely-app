@@ -26,6 +26,7 @@ mod m0003_create_libraries;
 mod m0004_create_library_memberships;
 mod m0005_create_media_types;
 mod m0006_create_genres;
+mod m0007_create_tags;
 
 pub struct Migrator;
 
@@ -39,6 +40,7 @@ impl MigratorTrait for Migrator {
             Box::new(m0004_create_library_memberships::Migration),
             Box::new(m0005_create_media_types::Migration),
             Box::new(m0006_create_genres::Migration),
+            Box::new(m0007_create_tags::Migration),
         ]
     }
 }

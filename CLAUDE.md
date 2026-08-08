@@ -58,7 +58,7 @@ One crate, `tomely-api`, with two binaries sharing `src/lib.rs`:
 | `src/state.rs`       | `AppState { db, jwt }`, the axum `State`                                           |
 | `src/error.rs`       | `ApiError` + `IntoResponse` + `From<DbErr>`                                        |
 | `src/auth/`          | password hashing, JWT issue/verify, the `CurrentUser` extractor                    |
-| `src/routes/`        | the router; `/health`, `/setup*`, `/auth/*`, `/libraries*`                         |
+| `src/routes/`        | the router; `/health`, `/setup*`, `/auth/*`, `/libraries*`, the catalogues         |
 | `src/migrations/`    | schema migrations — the source of truth                                            |
 | `src/entities/`      | generated SeaORM entities — never hand-edit                                        |
 
@@ -186,6 +186,56 @@ same kind of thing; the validation, the ordering and the delete guard are shared
   widened with a null description by `asEntries` rather than the panel learning
   which catalogue it has.
 
+### Library tags
+
+A tag is the word a reader invents for their own shelves — `tags` (m0007, name +
+optional colour), served by `src/routes/tags.rs` under
+`/libraries/{library_id}/tags`. The mirror image of a catalogue, and the section
+above is the argument: a genre has to be instance-wide or "everything I own of
+this kind" has no answer, whereas two people's "to read" mean two different
+things and a shared list would make one of them wrong.
+
+- **Per library, which is also who may write.** A catalogue's writes take
+  `InstanceAdmin` because a rename there is a rename in everybody's library at
+  once; a tag rename is a rename in one, so the gate is membership of that one.
+  **Reading takes any member** and **writing takes an owner or an editor**.
+- **`member_role` and `require_editor` in `routes/libraries.rs` are the pair.**
+  `member_role` is `visible_one` with the library's own columns dropped — the
+  seam anything living _inside_ a library reaches the 404 through, so
+  `LibraryRow` stays private. `require_editor` sits beside `require_owner` and
+  is deliberately looser: that one guards the library row, which is the owner's
+  to decide, this one guards its contents, which is an editor's job. A viewer is
+  the one role they disagree about.
+- **Names are unique per library, case-insensitively**, through
+  `tags_library_name_key`. The same name in two libraries is two rows and means
+  whatever each owner wants. `From<DbErr>` turns the violation into the 409 that
+  `TagsPanel` says "That tag already exists." for.
+- **The index is written `((library_id::text), lower(name))` on purpose.** Spelled
+  the obvious way it has one ordinary key column, and `sea-orm-cli generate
+entity` reads that as "`library_id` is unique" — one tag per library — and
+  downgrades the relation to `has_one`. The cast makes the whole key an
+  expression, invisible to codegen exactly as `media_types_name_key` is. That is
+  also why `tags_library_id_idx` exists: an all-expression key cannot serve
+  "every tag in this library".
+- **No usage count and no delete guard**, unlike `bookCount` and
+  `require_unused` next door. The page promises that deleting a tag removes it
+  from everything it is on, so the count would have nobody to read it and the
+  guard would contradict the copy. When books and shelves arrive they carry the
+  cascade the way m0004's memberships do.
+- **A colour is a Mantine colour name, not a hex value**, so a tag drawn with one
+  is right in both themes. `COLORS` in `routes/tags.rs` and `TAG_COLORS` in
+  `app/src/lib/tags.ts` are the same fourteen; the API refuses anything else, so
+  adding a colour to the client alone gets a 400.
+- Editing them is the **Tags** tab of `/libraries/{id}/settings`, drawn by
+  `TagsPanel` — modelled on `CataloguePanel` rather than sharing it, because a
+  colour would be dead weight on the other two pages. The tab is a `?tab=` search
+  param so it survives a reload and can be linked to.
+- **The add-book form holds tag _names_, where it holds genre _ids_.** A genre is
+  a row the draft must point at and the field offers nothing else; a library's
+  tags are _suggestions_, and a reader who wants a word nobody has used yet types
+  it. Nothing is created by typing one — there is no book to save it against yet,
+  and the books endpoint is what will resolve names to rows.
+
 ### Web app (`app/`)
 
 - File-based routes in `app/src/routes/`; `routeTree.gen.ts` is generated — never
@@ -247,14 +297,17 @@ a different book:
   them: they are rows, fetched through `app/src/lib/catalogue.ts`, and a
   `BookDraft` holds their **ids**. That is why `DEFAULT_MEDIA_TYPE` is gone —
   there is no server-side notion of a default one, so the field starts empty and
-  the required rule asks. Tags are the exception and always will be: free text, no
-  list to fetch. `draftFromResult` is the whole prefill rule, in one pure function.
+  the required rule asks. Tags are rows too now — see **Library tags** — but the
+  draft holds their **names**, because one of them may not have a row yet.
+  `draftFromResult` is the whole prefill rule, in one pure function.
 - `BookSearchPanel` and `BookForm` know nothing about the router; the routes hand
   them their state and decide where their links go. `BookForm` takes the two
-  catalogues as props for the same reason — the route owns the queries. It must
-  not be mounted before its `initial` **or** those lists have settled: `useForm`
-  reads `defaultValues` once, and a `Select` handed an empty list cannot show the
-  value it already holds.
+  catalogues and the library's tags as props for the same reason — the route owns
+  the queries. It must not be mounted before its `initial` **or** those lists have
+  settled: `useForm` reads `defaultValues` once, and a `Select` handed an empty
+  list cannot show the value it already holds. The tags are in that gate even
+  though a `TagsInput` with no suggestions still works, because a field that
+  silently offers nothing reads as a library with no tags.
 - Nothing saves. **Save book** is disabled inside `Soon`, like every other unbuilt
   control on the books page.
 
@@ -332,13 +385,19 @@ dashboard layout, drawn against an empty summary. Libraries end to end: the
 `libraries` / `library_memberships` schema, `GET`/`POST /libraries` and
 `GET`/`PUT`/`DELETE /libraries/{id}`, a `/libraries` page that lists and creates
 them — each card carrying a menu to edit or delete it — and a
-`/libraries/{id}/settings` page that renames one, changes its description or
-deletes it, read-only for a member who is not an owner. The instance catalogues
+`/libraries/{id}/settings` page in two tabs — **General**, which renames one,
+changes its description or deletes it, read-only for a member who is not an
+owner, and **Tags**. The instance catalogues
 end to end: the `media_types` / `genres` schema and its seed, `GET`/`POST` and
 `PUT`/`DELETE` on both, the `InstanceAdmin` extractor that gates the writes, and
 the `/admin/settings/media-types` and `/admin/settings/genres` pages that add,
 rename and remove entries — with the add-book form drawing its media type and
-genre fields from them.
+genre fields from them. Library tags end to end: the `tags` schema,
+`GET`/`POST /libraries/{id}/tags` and `PUT`/`DELETE /libraries/{id}/tags/{tagId}`,
+the `member_role` / `require_editor` pair that gates them, and the Tags tab that
+adds, renames, recolours and removes them — with the add-book form suggesting
+them. They are attached to nothing yet, because books, shelves, loans and members
+do not exist; the same caveat `bookCount` carries.
 
 Drawn but not wired: `/libraries/{id}/books` and the two pages of the add-book
 wizard behind it — see below. Their vocabulary is real now; the book itself still
@@ -346,7 +405,7 @@ has nowhere to be saved.
 
 Not built yet: sharing a library — the roles and the membership table are there,
 but there is no endpoint to invite anyone, so every membership is its owner's,
-and the `library_owner`-only rule on writing to one has nobody to exclude yet.
+and neither `require_owner` nor `require_editor` has anybody to exclude yet.
 Handing a
 library over to a new primary owner. Every domain endpoint (books, shelves,
 authors, series) and so the data behind the dashboard and behind the books page —

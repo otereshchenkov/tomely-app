@@ -1,0 +1,97 @@
+/* The add row sits above the list inside one bordered card, so the two read as
+   one control rather than as a form that happens to be near a table. Same shape
+   as `CataloguePanel.module.css`, which is the panel this one is modelled on. */
+.panel {
+  overflow: hidden;
+}
+
+.form {
+  padding: var(--mantine-spacing-md);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.row {
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+/* The last row's border would double up with the card's own. */
+.row:last-of-type {
+  border-bottom: none;
+}
+
+.row:hover {
+  background-color: var(--mantine-color-default-hover);
+}
+
+/* The actions are quiet until the row is pointed at or something in it has
+   keyboard focus - a list of tags at full-strength icons is a wall. They stay at
+   full opacity for anyone who has turned motion and subtle cues down. */
+.actions {
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actions {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* One swatch. A button rather than a div so it is reachable by keyboard and
+   announced as the radio it behaves like. */
+.swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--mantine-radius-xl);
+  background-color: var(--swatch-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-white);
+}
+
+/* The chosen one is ringed rather than ticked: a tick inside a 22px circle is
+   unreadable on the pale end of the palette, and the ring reads at a glance. */
+.swatchChosen {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/* "No colour": an outlined circle, so the absence is a choice on the row rather
+   than a gap in it. */
+.swatchNone {
+  background-color: transparent;
+  border: 1px solid var(--mantine-color-default-border);
+  color: var(--mantine-color-dimmed);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/* The dot in front of a tag's name in the list. Sized to sit on the text's
+   baseline rather than above it. */
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--mantine-radius-xl);
+  background-color: var(--swatch-color);
+  flex: none;
+}
+
+/* A tag with no colour still gets a dot, so every row lines up. */
+.dotNone {
+  background-color: transparent;
+  border: 1px solid var(--mantine-color-default-border);
+}

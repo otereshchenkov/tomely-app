@@ -10,8 +10,13 @@
  * file, so replacing them is a change to this module and not a search through
  * the form.
  *
- * Tags are the exception and always will be: they are free text the reader
- * invents while typing, so there is no list to fetch.
+ * Tags are now rows too - `tags.ts`, and the Tags tab of a library's settings -
+ * but they are not vocabulary in the way the two catalogues are. A genre is a
+ * word an instance has agreed on and the form offers those and nothing else; a
+ * library's tags are offered as *suggestions*, and a reader who wants a word
+ * nobody has used yet types it. That is why `BookDraft.tags` holds names where
+ * `BookDraft.genres` holds ids: a genre is a row the draft points at, a tag may
+ * still be a word waiting for one. The books endpoint is what will resolve them.
  */
 import type { BookSearchResult } from './bookSearch'
 
@@ -112,6 +117,7 @@ export interface BookDraft {
   mediaType: string
   description: string
   contributors: Contributor[]
+  /** Tag *names*, not ids - one may not have a row yet. See the module note. */
   tags: string[]
   /** `genres` row ids. */
   genres: string[]

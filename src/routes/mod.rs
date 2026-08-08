@@ -11,6 +11,7 @@ pub mod auth;
 pub mod catalogue;
 pub mod libraries;
 pub mod setup;
+pub mod tags;
 
 pub fn router(state: AppState) -> Router {
     Router::new()
@@ -19,6 +20,7 @@ pub fn router(state: AppState) -> Router {
         .merge(auth::router())
         .merge(libraries::router())
         .merge(catalogue::router())
+        .merge(tags::router())
         .with_state(state)
 }
 

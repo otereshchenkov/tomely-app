@@ -131,6 +131,19 @@ export function canManage(library: Library | undefined): boolean {
   return library?.role === 'library_owner'
 }
 
+/**
+ * Whether the caller may change what is *in* this library - its tags today, its
+ * books and shelves when they arrive.
+ *
+ * Looser than `canManage` on purpose, matching `require_editor` in
+ * `src/routes/libraries.rs`: renaming a library is the owner's to decide,
+ * filing things inside one is an editor's job. The same caveats apply - this
+ * decides what to offer, the API is the rule, and `undefined` is no.
+ */
+export function canEdit(library: Library | undefined): boolean {
+  return library?.role === 'library_owner' || library?.role === 'library_editor'
+}
+
 /** The order `GET /libraries` returns, so a locally added one lands where the
  *  server would have put it and the list does not jump on the next fetch. */
 export function byName(a: Library, b: Library): number {

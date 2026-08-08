@@ -9,6 +9,7 @@ import { BookForm } from './BookForm'
 
 import type { BookSearchResult } from '#/lib/bookSearch'
 import type { Genre, MediaType } from '#/lib/catalogue'
+import type { Tag } from '#/lib/tags'
 
 // The two catalogues, as the page above would have fetched them. Small enough to
 // be readable and varied enough that picking the wrong one shows.
@@ -52,6 +53,27 @@ const GENRES: Array<Genre> = [
     id: 'g-horror',
     name: 'Horror',
     bookCount: 0,
+    createdAt: '',
+    updatedAt: '',
+  },
+]
+
+// This library's tags, as the page above would have fetched them. One with a
+// colour and one without, since the column is optional.
+const TAGS: Array<Tag> = [
+  {
+    id: 't-heroic',
+    libraryId: 'lib',
+    name: 'heroic',
+    color: 'blue',
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 't-war',
+    libraryId: 'lib',
+    name: 'war',
+    color: null,
     createdAt: '',
     updatedAt: '',
   },
@@ -107,6 +129,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -126,6 +149,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -149,6 +173,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -171,6 +196,7 @@ describe('BookForm', () => {
         initial={draftFromResult(aResult())}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -193,6 +219,7 @@ describe('BookForm', () => {
         )}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -209,6 +236,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -230,6 +258,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -237,6 +266,33 @@ describe('BookForm', () => {
     await user.type(combo('Tags'), 'to reread{Enter}')
 
     expect(screen.getByText('to reread')).toBeTruthy()
+  })
+
+  it('suggests the tags this library already has', async () => {
+    // The opposite of the genres field below: those are a closed list, these are
+    // suggestions, and a reader who wants a word nobody has used yet gets it.
+    const user = userEvent.setup()
+
+    renderWithProviders(
+      <BookForm
+        initial={emptyDraft()}
+        mediaTypes={MEDIA_TYPES}
+        genres={GENRES}
+        tags={TAGS}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(combo('Tags'))
+
+    expect(await option('heroic')).toBeTruthy()
+    expect(await option('war')).toBeTruthy()
+
+    await user.click(await option('heroic'))
+
+    // Picked, and out of the list - `TagsInput` takes a chosen option away
+    // rather than ticking it, which is why its options carry no check.
+    expect(screen.getByText('heroic')).toBeTruthy()
   })
 
   it('offers genres from the instance catalogue, and takes nothing else', async () => {
@@ -247,6 +303,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -272,6 +329,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -285,6 +343,7 @@ describe('BookForm', () => {
         initial={draftFromResult(aResult())}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -309,6 +368,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -328,6 +388,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={vi.fn()}
       />,
     )
@@ -347,6 +408,7 @@ describe('BookForm', () => {
         initial={emptyDraft()}
         mediaTypes={MEDIA_TYPES}
         genres={GENRES}
+        tags={TAGS}
         onCancel={onCancel}
       />,
     )

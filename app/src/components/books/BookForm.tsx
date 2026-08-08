@@ -32,6 +32,7 @@ import { z } from 'zod'
 import { BookCover } from '#/components/dashboard/BookRow'
 import { Soon } from '#/components/books/BooksToolbar'
 import { useFieldErrors } from '#/lib/form'
+import { swatch } from '#/lib/tags'
 import {
   CONTRIBUTOR_ROLES,
   DEFAULT_CONTRIBUTOR_ROLE,
@@ -44,6 +45,7 @@ import classes from './BookForm.module.css'
 
 import type { BookDraft, EditionFormat } from '#/lib/books'
 import type { Genre, MediaType } from '#/lib/catalogue'
+import type { Tag } from '#/lib/tags'
 import type { TablerIcon } from '@tabler/icons-react'
 
 /** A catalogue row as Mantine's `Select`/`MultiSelect` want it: id, then label. */
@@ -83,6 +85,37 @@ function MediaTypeOption({
           </Text>
         ) : null}
       </Stack>
+    </Group>
+  )
+}
+
+/**
+ * One suggestion in the tags dropdown: the tag's colour, then its name.
+ *
+ * No check icon, unlike `MediaTypeOption`. `TagsInput` takes a picked option out
+ * of the list rather than ticking it, so there is never one to draw.
+ */
+function TagOption({
+  label,
+  color,
+}: Readonly<{ label: string; color: string | null }>) {
+  return (
+    <Group gap="xs" wrap="nowrap">
+      <span
+        aria-hidden
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          flex: 'none',
+          background: color === null ? 'transparent' : swatch(color),
+          border:
+            color === null
+              ? '1px solid var(--mantine-color-default-border)'
+              : undefined,
+        }}
+      />
+      <Text fz="sm">{label}</Text>
     </Group>
   )
 }
@@ -182,14 +215,15 @@ type ErrorFor = (name: string) => string | undefined
  * nothing anywhere to say why. `LibraryDetailsForm` carries the same warning
  * and the routes gate on it the same way.
  *
- * The two catalogues arrive as props rather than being fetched here, so this
- * stays as router-free and request-free as it has always been - and so the same
- * gate that waits for `initial` covers them too.
+ * The two catalogues and the library's tags arrive as props rather than being
+ * fetched here, so this stays as router-free and request-free as it has always
+ * been - and so the same gate that waits for `initial` covers them too.
  */
 export function BookForm({
   initial,
   mediaTypes,
   genres,
+  tags,
   coverUrl = null,
   onCancel,
 }: Readonly<{
@@ -197,6 +231,8 @@ export function BookForm({
   /** The instance's media types, in the order `GET /media-types` returns them. */
   mediaTypes: Array<MediaType>
   genres: Array<Genre>
+  /** This library's tags. Suggestions, not a closed list - see the field. */
+  tags: Array<Tag>
   /** The cover of the search result this was filled in from. Shown, not
    *  edited - uploading one is a later job. */
   coverUrl?: string | null
@@ -210,6 +246,12 @@ export function BookForm({
   const mediaTypeDescriptions = useMemo(
     () => new Map(mediaTypes.map((type) => [type.id, type.description])),
     [mediaTypes],
+  )
+
+  // The tags field works in names, so the colour has to be looked up by one.
+  const tagColors = useMemo(
+    () => new Map(tags.map((tag) => [tag.name, tag.color])),
+    [tags],
   )
 
   return (
@@ -317,11 +359,29 @@ export function BookForm({
         <Contributors form={form} errorFor={errorFor} />
 
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          {/* A `TagsInput` rather than the `MultiSelect` beside it, and the
+              difference is what the two fields hold. A genre is a row this
+              draft has to point at, so it carries ids; a tag is a word the
+              reader may be inventing as they type, so it carries names and the
+              library's own tags are offered as suggestions rather than as the
+              only answers. Creating one here does not create the row - there is
+              no book to save it against yet - so a genuinely new word lives in
+              the draft until the books endpoint arrives to resolve it.
+
+              The colour shows on the options and not on the pills: Mantine 9's
+              `TagsInput` renders those itself and takes no `renderPill`. */}
           <form.Field name="tags">
             {(field) => (
               <TagsInput
                 label="Tags"
                 placeholder="Search or create tags…"
+                data={tags.map((tag) => tag.name)}
+                renderOption={({ option }) => (
+                  <TagOption
+                    label={option.value}
+                    color={tagColors.get(option.value) ?? null}
+                  />
+                )}
                 value={field.state.value}
                 onChange={field.handleChange}
                 onBlur={field.handleBlur}

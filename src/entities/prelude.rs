@@ -4,5 +4,6 @@ pub use super::genres::Entity as Genres;
 pub use super::libraries::Entity as Libraries;
 pub use super::library_memberships::Entity as LibraryMemberships;
 pub use super::media_types::Entity as MediaTypes;
+pub use super::tags::Entity as Tags;
 pub use super::user_identities::Entity as UserIdentities;
 pub use super::users::Entity as Users;
