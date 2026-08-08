@@ -90,7 +90,7 @@ export function CataloguePanel({
 
   return (
     <>
-      <Card withBorder radius="md" padding={0} className={classes.panel}>
+      <Card withBorder radius="md" padding={0} className={classes.panel} maw={600}>
         <AddEntryForm
           noun={noun}
           withDescription={withDescription}
