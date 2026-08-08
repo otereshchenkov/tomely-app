@@ -13,6 +13,7 @@ import {
   IconLayoutColumns,
   IconLayoutGrid,
   IconList,
+  IconPlus,
 } from '@tabler/icons-react'
 
 import classes from './BooksToolbar.module.css'
@@ -45,14 +46,19 @@ export function Soon({
  * Everything you can do to a shelf of books: search it, change how it is laid
  * out, add to it.
  *
- * None of it is wired, because there is no books endpoint yet - every control is
- * disabled and says "Soon", the way an unbuilt destination in `AppNav` does. It
- * is drawn now so the page has the shape it will keep, and so wiring it later is
- * a matter of handing these controls their state rather than inventing a layout.
+ * Only "Add book" is wired - it opens the add-book wizard, which is a UI over a
+ * stubbed search and saves nothing yet. The rest waits on a books endpoint, and
+ * until then is disabled and says "Soon", the way an unbuilt destination in
+ * `AppNav` does. Drawn now so the page has the shape it will keep, and so
+ * wiring the rest later is a matter of handing these controls their state
+ * rather than inventing a layout.
  *
- * Router-agnostic on purpose, so it can be exercised without one.
+ * Router-agnostic on purpose, so it can be exercised without one: the page
+ * above decides where "Add book" goes.
  */
-export function BooksToolbar() {
+export function BooksToolbar({
+  onAddBook,
+}: Readonly<{ onAddBook: () => void }>) {
   return (
     <Group gap="sm">
       <Soon flex={1} miw={240}>
@@ -116,9 +122,9 @@ export function BooksToolbar() {
         </Button>
       </Soon>
 
-      <Soon>
-        <Button disabled>Add book</Button>
-      </Soon>
+      <Button leftSection={<IconPlus size={16} />} onClick={onAddBook}>
+        Add book
+      </Button>
     </Group>
   )
 }

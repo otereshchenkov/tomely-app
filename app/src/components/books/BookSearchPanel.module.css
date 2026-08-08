@@ -1,0 +1,41 @@
+/*
+ * A whole result is the target, not the title inside it - a row of metadata is
+ * easier to hit than a line of text, and there is nothing else in the row to
+ * click. `UnstyledButton` fills the card so the padding is part of the target.
+ */
+.result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background-color: light-dark(
+    var(--mantine-color-gray-0),
+    var(--mantine-color-dark-6)
+  );
+}
+
+.result:hover {
+  background-color: light-dark(
+    var(--mantine-color-gray-1),
+    var(--mantine-color-dark-5)
+  );
+}
+
+/*
+ * Keyboard focus needs its own mark: the hover tint alone is too quiet to
+ * follow while tabbing down fifteen results.
+ */
+.result:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/*
+ * The count above the list. Small, upper-case and quiet, so it reads as a label
+ * for what follows rather than as the first result.
+ */
+.count {
+  letter-spacing: 0.06em;
+}

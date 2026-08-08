@@ -187,6 +187,35 @@ back an empty summary, so every card renders its empty state; the cards take the
 data as props and know nothing about where it comes from. When `GET /dashboard`
 exists, `useDashboard` becomes a query and nothing above it changes.
 
+#### Adding a book
+
+Two pages rather than a dialog, so the reader can go back to their results and pick
+a different book:
+
+| Route                              | What it is                                      |
+| ---------------------------------- | ----------------------------------------------- |
+| `/libraries/{id}/books/add`        | search a provider, or skip straight to the form |
+| `/libraries/{id}/books/new?q&from` | the book form, blank or filled in from a result |
+
+- `app/src/lib/bookSearch.ts` is the seam, the way `dashboard.ts` is: a fixed
+  catalogue behind a pause, matched word by word. When `GET /book-search` exists,
+  `searchBooks` becomes an `apiFetch` and nothing above it changes.
+- **The search lives in the URL and the results live in the query cache.** `?q` is
+  what makes a search linkable and the back button work; `staleTime: Infinity` on
+  `bookSearchQuery` is what lets the form step offer a way back to results that are
+  still there. `?from` names the picked result inside that cached search rather than
+  carrying a JSON blob through the address bar — and because the stand-in is
+  deterministic, a cold cache just runs the same search again and finds it.
+- `app/src/lib/books.ts` holds the vocabulary — media types, contributor roles,
+  genres, languages, shelves — as constants, each marked as standing in for a table
+  that does not exist yet. Tags are the exception: free text, no list to fetch.
+  `draftFromResult` is the whole prefill rule, in one pure function.
+- `BookSearchPanel` and `BookForm` know nothing about the router; the routes hand
+  them their state and decide where their links go. `BookForm` must not be mounted
+  before its `initial` has settled — `useForm` reads `defaultValues` once.
+- Nothing saves. **Save book** is disabled inside `Soon`, like every other unbuilt
+  control on the books page.
+
 ### Why SSR, and what it demands
 
 Public pages — shelf, book, author, series — get shared with people who have no
@@ -264,11 +293,14 @@ them — each card carrying a menu to edit or delete it — and a
 `/libraries/{id}/settings` page that renames one, changes its description or
 deletes it, read-only for a member who is not an owner.
 
+Drawn but not wired: `/libraries/{id}/books` and the two pages of the add-book
+wizard behind it — see below.
+
 Not built yet: sharing a library — the roles and the membership table are there,
 but there is no endpoint to invite anyone, so every membership is its owner's,
 and the `library_owner`-only rule on writing to one has nobody to exclude yet.
 Handing a
-library over to a new primary owner. Every other domain endpoint (books, shelves,
-authors, series) and so the data behind the dashboard and behind
-`/libraries/{id}/books`, which is a stub. Password change and user management,
-OIDC and passkey providers, and the Dockerfiles for the two services.
+library over to a new primary owner. Every domain endpoint (books, shelves,
+authors, series) and so the data behind the dashboard and behind the books page.
+Password change and user management, OIDC and passkey providers, and the
+Dockerfiles for the two services.

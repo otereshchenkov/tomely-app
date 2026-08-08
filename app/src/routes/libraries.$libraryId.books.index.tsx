@@ -1,13 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Alert, Button, Card, Center, Loader, Stack, Text } from '@mantine/core'
 
 import { AppLayout } from '#/components/layout/AppLayout'
 import { RequireAuth } from '#/components/RequireAuth'
-import { BooksToolbar, Soon } from '#/components/books/BooksToolbar'
+import { BooksToolbar } from '#/components/books/BooksToolbar'
 import { LibraryBreadcrumbs } from '#/components/libraries/LibraryBreadcrumbs'
 import { useLibrary } from '#/lib/libraries'
 
-export const Route = createFileRoute('/libraries/$libraryId/books')({
+export const Route = createFileRoute('/libraries/$libraryId/books/')({
   component: LibraryBooks,
 })
 
@@ -16,7 +16,7 @@ export const Route = createFileRoute('/libraries/$libraryId/books')({
  *
  * Still a stub - there is no books endpoint yet - but a stub with the shape the
  * page will keep: a toolbar across the top, a shelf below it. Everything in the
- * toolbar is disabled and marked "Soon"; see `BooksToolbar`.
+ * toolbar except "Add book" is disabled and marked "Soon"; see `BooksToolbar`.
  *
  * The toolbar sits beside `RequireAuth` rather than inside it. It needs no
  * session, so it belongs in the server-rendered HTML for the same reason the
@@ -26,6 +26,16 @@ export const Route = createFileRoute('/libraries/$libraryId/books')({
 function LibraryBooks() {
   const { libraryId } = Route.useParams()
   const { data: library } = useLibrary(libraryId)
+  const navigate = useNavigate()
+
+  // One handler for both ways in, the way `libraries.index.tsx` shares one
+  // between its title-bar button and its empty state.
+  const addBook = () => {
+    void navigate({
+      to: '/libraries/$libraryId/books/add',
+      params: { libraryId },
+    })
+  }
 
   return (
     <AppLayout
@@ -33,16 +43,18 @@ function LibraryBooks() {
       title="Books"
     >
       <Stack gap="md">
-        <BooksToolbar />
+        <BooksToolbar onAddBook={addBook} />
         <RequireAuth>
-          <LibraryBooksContent />
+          <LibraryBooksContent onAddBook={addBook} />
         </RequireAuth>
       </Stack>
     </AppLayout>
   )
 }
 
-function LibraryBooksContent() {
+function LibraryBooksContent({
+  onAddBook,
+}: Readonly<{ onAddBook: () => void }>) {
   const { libraryId } = Route.useParams()
   const { isPending, error } = useLibrary(libraryId)
 
@@ -62,7 +74,7 @@ function LibraryBooksContent() {
     )
   }
 
-  return <EmptyBooks />
+  return <EmptyBooks onAddBook={onAddBook} />
 }
 
 /**
@@ -72,14 +84,12 @@ function LibraryBooksContent() {
  * one thing to do should be in the middle of it, not only tucked into a corner.
  * `EmptyLibraries` in `libraries.index.tsx` makes the same argument.
  */
-function EmptyBooks() {
+function EmptyBooks({ onAddBook }: Readonly<{ onAddBook: () => void }>) {
   return (
     <Card withBorder radius="md" padding="xl" style={{ borderStyle: 'dashed' }}>
       <Stack gap="md" align="center" py="xl">
         <Text c="dimmed">No books yet</Text>
-        <Soon>
-          <Button disabled>Add your first book</Button>
-        </Soon>
+        <Button onClick={onAddBook}>Add your first book</Button>
       </Stack>
     </Card>
   )
