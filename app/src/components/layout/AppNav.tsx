@@ -111,6 +111,20 @@ function sectionsFor(libraryId: string | undefined): NavSection[] {
                 { label: 'Shelves', icon: IconStack2, activePath: null },
                 { label: 'Loans', icon: IconArrowsShuffle, activePath: null },
                 { label: 'Members', icon: IconUsersGroup, activePath: null },
+                {
+                  // Shown to every member, not only to owners: the page is the
+                  // readable record of what the library is, and a member who
+                  // may not change it sees it read-only rather than not at all.
+                  // Deciding otherwise here would mean a second query, since
+                  // the nav has no library to read a role off.
+                  label: 'Settings',
+                  icon: IconSettings,
+                  link: linkOptions({
+                    to: '/libraries/$libraryId/settings',
+                    params: { libraryId },
+                  }),
+                  activePath: `/libraries/${libraryId}/settings`,
+                },
               ]
             : undefined,
         },

@@ -44,7 +44,7 @@ const MAX_DESCRIPTION_LENGTH: usize = 2_000;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/libraries", get(list).post(create))
-        .route("/libraries/{id}", get(one))
+        .route("/libraries/{id}", get(one).put(update).delete(remove))
 }
 
 /// A library as one of its members sees it.
@@ -156,27 +156,66 @@ async fn list(
     ))
 }
 
-/// One library, if the caller is in it.
+/// One library as `caller` sees it, or the 404 a stranger gets.
 ///
 /// A non-member gets a 404 rather than a 403: whether a given library exists is
-/// not something a stranger should be able to probe for.
+/// not something a stranger should be able to probe for. Factored out because
+/// every path that acts on a single library starts here, and that 404 is the
+/// load-bearing part of all of them.
+async fn visible_one<C: ConnectionTrait>(
+    db: &C,
+    caller: Uuid,
+    id: Uuid,
+) -> Result<LibraryRow, ApiError> {
+    visible_to(db, caller, Some(id))
+        .await?
+        .into_iter()
+        .next()
+        .ok_or_else(|| ApiError::NotFound("No such library".to_string()))
+}
+
+/// The gate on changing a library at all.
+///
+/// The role comes from the *membership*, never from `libraries.owner_id`. The
+/// primary owner holds an ordinary owner membership like anybody else, so this
+/// covers them without knowing they exist - and the moment one check
+/// special-cases `owner_id`, every future one has to as well.
+///
+/// A 403 rather than the 404 a non-member gets, and the difference is not an
+/// inconsistency: this is only ever reached through `visible_one`, so the
+/// caller has already been shown the library exists. Naming the rule tells them
+/// nothing they could not see, and it is the only answer they can act on.
+fn require_owner(role: &str) -> Result<(), ApiError> {
+    if role == OWNER_ROLE {
+        return Ok(());
+    }
+
+    Err(ApiError::Forbidden(
+        "Only an owner can change or delete a library".to_string(),
+    ))
+}
+
+/// One library, if the caller is in it.
 async fn one(
     State(state): State<AppState>,
     CurrentUser(claims): CurrentUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LibraryResponse>, ApiError> {
-    let row = visible_to(&state.db, claims.sub, Some(id))
-        .await?
-        .into_iter()
-        .next()
-        .ok_or_else(|| ApiError::NotFound("No such library".to_string()))?;
+    let row = visible_one(&state.db, claims.sub, id).await?;
 
     Ok(Json(row.into_response(claims.sub)))
 }
 
+/// The editable half of a library, as the caller sends it.
+///
+/// Shared by `POST` and `PUT` because they take the same thing: a library has
+/// exactly two fields anyone can set, and both requests always carry both. That
+/// is also why the update is a `PUT` rather than a `PATCH` - there is nothing
+/// here to patch around, and an absent `description` means "no description"
+/// rather than "leave it alone".
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CreateLibraryRequest {
+struct LibraryRequest {
     name: String,
     #[serde(default)]
     description: Option<String>,
@@ -227,7 +266,7 @@ fn clean(name: &str, description: Option<&str>) -> Result<LibraryFields, ApiErro
 async fn create(
     State(state): State<AppState>,
     CurrentUser(claims): CurrentUser,
-    Json(body): Json<CreateLibraryRequest>,
+    Json(body): Json<LibraryRequest>,
 ) -> Result<(StatusCode, Json<LibraryResponse>), ApiError> {
     let fields = clean(&body.name, body.description.as_deref())?;
 
@@ -285,6 +324,88 @@ async fn create(
     ))
 }
 
+/// Rename a library, or change what it says about itself.
+///
+/// A `PUT` because it is one: the two fields here are everything anyone may
+/// edit, the form that sends it always has both on screen, and `clean` - where
+/// the rules live - takes both or neither. A request that leaves `description`
+/// out therefore *clears* it rather than preserving it.
+///
+/// Permission before validation on purpose. A viewer who submits a blank name
+/// should be told they may not be here at all, not corrected on the spelling of
+/// a change that was never going to happen.
+///
+/// Last write wins. There is no version column and no `If-Match`, so two people
+/// renaming at once means the slower one's name is the one that sticks - which
+/// is worth knowing about rather than worth solving while a library has exactly
+/// one member.
+async fn update(
+    State(state): State<AppState>,
+    CurrentUser(claims): CurrentUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<LibraryRequest>,
+) -> Result<Json<LibraryResponse>, ApiError> {
+    let row = visible_one(&state.db, claims.sub, id).await?;
+    require_owner(&row.role)?;
+
+    let fields = clean(&body.name, body.description.as_deref())?;
+
+    let library = libraries::ActiveModel {
+        id: Set(id),
+        name: Set(fields.name),
+        description: Set(fields.description),
+        // m0004 gives the column a default and there is no trigger behind it, so
+        // a row never told it changed goes on claiming it was last touched when
+        // it was created.
+        updated_at: Set(Utc::now().into()),
+        ..Default::default()
+    }
+    .update(&state.db)
+    .await?;
+
+    // Rebuilt as a row rather than as a response directly, so `isPrimaryOwner`
+    // stays derived in exactly one place. The role is the one just read: nothing
+    // in this request could have changed it, and asking again would be a second
+    // trip for an answer already in hand.
+    Ok(Json(
+        LibraryRow {
+            id: library.id,
+            name: library.name,
+            description: library.description,
+            owner_id: library.owner_id,
+            role: row.role,
+            created_at: library.created_at.into(),
+            updated_at: library.updated_at.into(),
+        }
+        .into_response(claims.sub),
+    ))
+}
+
+/// Delete a library and everything hanging off it.
+///
+/// No transaction: `library_memberships.library_id` is `ON DELETE CASCADE`
+/// (m0005), so the memberships go in the same statement. Books and shelves
+/// should carry the same cascade when they arrive, rather than this growing a
+/// hand-rolled teardown.
+///
+/// 204 rather than the row that was deleted: there is nothing left to describe,
+/// and the caller already had it.
+///
+/// Named `remove` rather than `delete` so it cannot collide with
+/// `axum::routing::delete` if that is ever imported here.
+async fn remove(
+    State(state): State<AppState>,
+    CurrentUser(claims): CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    let row = visible_one(&state.db, claims.sub, id).await?;
+    require_owner(&row.role)?;
+
+    libraries::Entity::delete_by_id(id).exec(&state.db).await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,5 +441,34 @@ mod tests {
 
         let long = "é".repeat(MAX_DESCRIPTION_LENGTH + 1);
         assert_err!(clean("Loft", Some(&long)));
+    }
+
+    #[test]
+    fn an_owner_may_change_a_library() {
+        assert_ok!(require_owner(OWNER_ROLE));
+    }
+
+    #[test]
+    fn an_editor_or_a_viewer_may_not() {
+        // Refused rather than hidden: they can already see the library, so
+        // pretending it is not there would tell them nothing and help nobody.
+        assert!(matches!(
+            require_owner("editor"),
+            Err(ApiError::Forbidden(_))
+        ));
+        assert!(matches!(
+            require_owner("viewer"),
+            Err(ApiError::Forbidden(_))
+        ));
+    }
+
+    #[test]
+    fn a_role_nobody_defined_is_not_an_owner() {
+        // Roles are rows, so an instance can define as many as it likes.
+        // Anything that is not literally the owner role is refused rather than
+        // guessed at - including one that only differs by case, since m0003's
+        // unique index is on `lower(name)` and this comparison is not.
+        assert_err!(require_owner("librarian"));
+        assert_err!(require_owner("Owner"));
     }
 }

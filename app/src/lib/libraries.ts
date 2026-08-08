@@ -13,6 +13,8 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 import { apiFetch } from './api'
 import { useAuth } from './auth'
 
+import type { QueryClient } from '@tanstack/react-query'
+
 /** Matches `LibraryResponse` in src/routes/libraries.rs. */
 export interface Library {
   id: string
@@ -23,7 +25,8 @@ export interface Library {
    *  yet - an owner and the primary owner may do the same things - it is what
    *  puts the crown on the card. */
   isPrimaryOwner: boolean
-  /** The caller's role in this library, not a property of the library itself. */
+  /** The caller's role in this library, not a property of the library itself.
+   *  `owner` is the one that may rename or delete it - see `canManage`. */
   role: 'owner' | 'editor' | 'viewer'
   createdAt: string
   updatedAt: string
@@ -69,8 +72,93 @@ export function createLibrary(input: NewLibrary): Promise<Library> {
   })
 }
 
+/**
+ * The two things anyone may change about a library.
+ *
+ * Both, every time - `PUT /libraries/{id}` replaces both - and `null` rather
+ * than `undefined` for "no description". `undefined` would drop the key from
+ * the JSON and mean the same thing only by accident of the API's
+ * `#[serde(default)]`; saying it out loud does not depend on that.
+ *
+ * `NewLibrary` uses `undefined` for the same field because creating a library
+ * genuinely omits it. Clearing a description and never having had one are
+ * different requests, even though they leave the same row.
+ */
+export interface UpdateLibrary {
+  name: string
+  description: string | null
+}
+
+export function updateLibrary(
+  id: string,
+  input: UpdateLibrary,
+): Promise<Library> {
+  return apiFetch<Library>(`/libraries/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+/** Answers 204, so there is nothing to hand back. */
+export function deleteLibrary(id: string): Promise<void> {
+  return apiFetch<void>(`/libraries/${id}`, { method: 'DELETE' })
+}
+
+/**
+ * Whether the caller may rename or delete this library.
+ *
+ * The role, never `isPrimaryOwner`: the primary owner holds an ordinary owner
+ * membership like anyone else and the API checks the membership. Reading
+ * `ownerId` instead would hide controls the server would have allowed, the
+ * moment a library can be shared with a second owner.
+ *
+ * This decides what to *offer*. It is not the rule - the API is - and a client
+ * that gets it wrong gets a 403, not its own way.
+ *
+ * `undefined` while the library is still loading, which is the same as no.
+ */
+export function canManage(library: Library | undefined): boolean {
+  return library?.role === 'owner'
+}
+
 /** The order `GET /libraries` returns, so a locally added one lands where the
  *  server would have put it and the list does not jump on the next fetch. */
 export function byName(a: Library, b: Library): number {
   return a.name.localeCompare(b.name)
+}
+
+/**
+ * Put a changed library into both caches.
+ *
+ * There are two - the list under `['libraries']` and the single entry under
+ * `['libraries', id]` - and writing only one leaves the other showing the old
+ * name until something happens to refetch it. Re-sorted the way the API sorts,
+ * so a rename moves the card to where the next fetch would put it rather than
+ * leaving it to jump later.
+ */
+export function cacheLibrary(queryClient: QueryClient, library: Library): void {
+  queryClient.setQueryData<Library>(libraryQueryKey(library.id), library)
+  queryClient.setQueryData<Array<Library>>(librariesQueryKey, (previous) =>
+    previous
+      ?.map((existing) => (existing.id === library.id ? library : existing))
+      .sort(byName),
+  )
+}
+
+/**
+ * Forget a library that no longer exists.
+ *
+ * `removeQueries` rather than writing `undefined` over the single entry:
+ * anything still mounted against that key would go on holding a row the server
+ * will now 404 for. Removing it outright leaves nothing to hold.
+ *
+ * Anything *observing* that key when this runs falls back to pending and fires
+ * one doomed refetch, so a caller looking at the library it just deleted should
+ * be on its way somewhere else. See the settings page.
+ */
+export function forgetLibrary(queryClient: QueryClient, id: string): void {
+  queryClient.setQueryData<Array<Library>>(librariesQueryKey, (previous) =>
+    previous?.filter((library) => library.id !== id),
+  )
+  queryClient.removeQueries({ queryKey: libraryQueryKey(id) })
 }

@@ -5,6 +5,7 @@
 //! absent or bad token does; it does not cover the SQL itself - the advisory
 //! lock and the unique indexes need a real database to mean anything.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axum::Router;
@@ -13,10 +14,15 @@ use axum::http::{Request, StatusCode, header};
 use chrono::Utc;
 use claims::assert_ok;
 use http_body_util::BodyExt;
-use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+use sea_orm::{DatabaseBackend, IntoMockRow, MockDatabase, MockExecResult};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 use uuid::Uuid;
+
+/// One row of the libraries-joined-to-membership projection the library routes
+/// select, keyed by the column names `LibraryRow` in `routes/libraries.rs`
+/// reads - `role` included, which is the alias on the joined role's name.
+type LibraryRow<'a> = BTreeMap<&'a str, sea_orm::Value>;
 
 use tomely_api::auth::JwtKeys;
 use tomely_api::entities::users;
@@ -41,6 +47,20 @@ fn a_user() -> users::Model {
 
 /// A router whose database answers each query with the next batch given.
 fn app(query_results: Vec<Vec<users::Model>>) -> Router {
+    router_over(query_results)
+}
+
+/// The same, for routes whose queries do not come back as any one entity's
+/// model.
+///
+/// The library routes project three joined tables down to six columns and a
+/// role name, which is a `FromQueryResult` shape rather than a `Model` - so the
+/// rows go in as the columns `MockDatabase` keeps underneath either way.
+fn app_over_rows(query_results: Vec<Vec<LibraryRow<'_>>>) -> Router {
+    router_over(query_results)
+}
+
+fn router_over<T: IntoMockRow>(query_results: Vec<Vec<T>>) -> Router {
     let db = MockDatabase::new(DatabaseBackend::Postgres)
         .append_query_results(query_results)
         // For statements that return no rows - /health's `SELECT 1`, the setup
@@ -106,6 +126,67 @@ fn post_with_token(path: &str, token: &str, body: &Value) -> Request<Body> {
             .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::from(body.to_string()))
     )
+}
+
+/// A PUT carrying a bearer token.
+fn put_with_token(path: &str, token: &str, body: &Value) -> Request<Body> {
+    assert_ok!(
+        Request::builder()
+            .method("PUT")
+            .uri(path)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::from(body.to_string()))
+    )
+}
+
+fn put(path: &str, body: &Value) -> Request<Body> {
+    assert_ok!(
+        Request::builder()
+            .method("PUT")
+            .uri(path)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+    )
+}
+
+/// A DELETE carrying a bearer token. No body - there is nothing to say.
+fn delete_with_token(path: &str, token: &str) -> Request<Body> {
+    assert_ok!(
+        Request::builder()
+            .method("DELETE")
+            .uri(path)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+    )
+}
+
+fn delete(path: &str) -> Request<Body> {
+    assert_ok!(
+        Request::builder()
+            .method("DELETE")
+            .uri(path)
+            .body(Body::empty())
+    )
+}
+
+/// A library the caller is a member of, in the shape the membership join
+/// returns it.
+fn a_library_row(id: Uuid, owner: Uuid, role: &str) -> LibraryRow<'static> {
+    // `DateTime<Utc>`, matching `LibraryRow`'s own columns - a fixed-offset
+    // value here deserializes as a different type and the row silently fails to
+    // build, which surfaces as a 500 rather than as anything useful.
+    let now: sea_orm::Value = Utc::now().into();
+
+    BTreeMap::from([
+        ("id", id.into()),
+        ("name", "Loft".into()),
+        ("description", Option::<String>::None.into()),
+        ("owner_id", owner.into()),
+        ("role", role.to_string().into()),
+        ("created_at", now.clone()),
+        ("updated_at", now),
+    ])
 }
 
 /// A token for `a_user()`, for the routes that only care that there is one.
@@ -319,6 +400,114 @@ async fn a_library_the_caller_is_not_in_does_not_exist_as_far_as_they_know() {
 
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(body["error"], "NotFound");
+}
+
+#[tokio::test]
+async fn renaming_a_library_needs_a_token() {
+    let (status, _) = send(
+        app(vec![]),
+        put(
+            &format!("/libraries/{}", Uuid::now_v7()),
+            &json!({ "name": "Loft" }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn deleting_a_library_needs_a_token() {
+    let (status, _) = send(
+        app(vec![]),
+        delete(&format!("/libraries/{}", Uuid::now_v7())),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn a_library_the_caller_is_not_in_cannot_be_renamed() {
+    // The same empty join, and so the same 404 the read path gives, for the same
+    // reason: a stranger learns nothing about which ids are real.
+    let (status, body) = send(
+        app(vec![vec![]]),
+        put_with_token(
+            &format!("/libraries/{}", Uuid::now_v7()),
+            &a_token(),
+            &json!({ "name": "Loft" }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["error"], "NotFound");
+}
+
+#[tokio::test]
+async fn a_library_the_caller_is_not_in_cannot_be_deleted() {
+    let (status, body) = send(
+        app(vec![vec![]]),
+        delete_with_token(&format!("/libraries/{}", Uuid::now_v7()), &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["error"], "NotFound");
+}
+
+#[tokio::test]
+async fn a_member_who_is_not_an_owner_may_not_rename_a_library() {
+    // A 403 rather than the 404 a non-member gets, and the difference is the
+    // point: this caller has already been shown the library, so there is nothing
+    // left to hide by pretending it is not there.
+    let id = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_library_row(id, Uuid::now_v7(), "editor")]]),
+        put_with_token(
+            &format!("/libraries/{id}"),
+            &a_token(),
+            &json!({ "name": "Loft" }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body["error"], "Forbidden");
+}
+
+#[tokio::test]
+async fn a_member_who_is_not_an_owner_may_not_delete_a_library() {
+    let id = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_library_row(id, Uuid::now_v7(), "viewer")]]),
+        delete_with_token(&format!("/libraries/{id}"), &a_token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body["error"], "Forbidden");
+}
+
+#[tokio::test]
+async fn an_owner_renaming_a_library_still_has_to_give_it_a_name() {
+    // Permission is checked before the name is: a caller who may not be here at
+    // all should be told that, not corrected on their spelling. Reaching a 400
+    // is what proves the owner got past the gate.
+    let id = Uuid::now_v7();
+    let (status, body) = send(
+        app_over_rows(vec![vec![a_library_row(id, Uuid::now_v7(), "owner")]]),
+        put_with_token(
+            &format!("/libraries/{id}"),
+            &a_token(),
+            &json!({ "name": "   " }),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["message"], "Name is required");
 }
 
 #[tokio::test]

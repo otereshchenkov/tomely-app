@@ -128,6 +128,12 @@ rather than a 403, so ids cannot be probed for.
   `OWNER_ROLE` in `routes/libraries.rs` does. Renaming one of the three breaks
   that lookup; adding a role does not. Users defining their own roles is the
   reason this is a table at all.
+- **Roles now gate something.** Only an `owner` membership may rename or delete a
+  library. A member who is not one gets a 403, not the 404 a stranger gets: by
+  then they have already been shown the library exists, so naming the rule tells
+  them nothing they could not see, and it is the only answer they can act on.
+  `visible_one` and `require_owner` in `routes/libraries.rs` are the pair every
+  future write should go through.
 - **The primary owner is recorded twice.** `libraries.owner_id` is the thing that
   cannot be revoked; the same person also gets an ordinary membership with the
   `owner` role and a null `invited_by` — nobody invited them. Permission checks
@@ -246,11 +252,15 @@ Working: the compose Postgres, the migration CLI, the axum server, the `users` /
 web app with `/setup`, `/login` and a `/dashboard` — the signed-in shell and the
 dashboard layout, drawn against an empty summary. Libraries end to end: the
 `roles` / `libraries` / `library_memberships` schema, `GET`/`POST /libraries` and
-`GET /libraries/{id}`, and a `/libraries` page that lists and creates them.
+`GET`/`PUT`/`DELETE /libraries/{id}`, a `/libraries` page that lists and creates
+them — each card carrying a menu to edit or delete it — and a
+`/libraries/{id}/settings` page that renames one, changes its description or
+deletes it, read-only for a member who is not an owner.
 
 Not built yet: sharing a library — the roles and the membership table are there,
-but there is no endpoint to invite anyone, so every membership is its owner's.
-Renaming or deleting a library. Every other domain endpoint (books, shelves,
+but there is no endpoint to invite anyone, so every membership is its owner's,
+and the `owner`-only rule on writing to one has nobody to exclude yet. Handing a
+library over to a new primary owner. Every other domain endpoint (books, shelves,
 authors, series) and so the data behind the dashboard and behind
 `/libraries/{id}/books`, which is a stub. Password change and user management,
 OIDC and passkey providers, and the Dockerfiles for the two services.
